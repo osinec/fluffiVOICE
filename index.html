@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluffi Bird - Voice Controlled</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background-color: #87CEEB;
+            border: 3px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #bird {
+            position: absolute;
+            width: 40px;
+            height: 30px;
+            background-color: #FFD700;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            left: 50px;
+            top: 300px;
+            z-index: 10;
+        }
+        
+        #bird:before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #FF6347;
+            border-radius: 50%;
+            top: 5px;
+            right: 5px;
+        }
+        
+        #bird:after {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 8px;
+            background-color: #FF8C00;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            bottom: -5px;
+            right: -5px;
+            transform: rotate(-30deg);
+        }
+        
+        .pipe {
+            position: absolute;
+            width: 60px;
+            background-color: #2E8B57;
+            border: 2px solid #228B22;
+            border-radius: 5px;
+            right: -60px;
+        }
+        
+        .pipe-top {
+            top: 0;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .pipe-bottom {
+            bottom: 0;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+        
+        #start-screen, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            z-index: 200;
+        }
+        
+        #game-over {
+            display: none;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #FFD700;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        
+        button:hover {
+            background-color: #FFC600;
+        }
+        
+        #mic-status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-size: 16px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        #volume-meter {
+            position: absolute;
+            bottom: 50px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #volume-level {
+            height: 100%;
+            width: 0%;
+            background-color: #FFD700;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score">0</div>
+        <div id="bird"></div>
+        <div id="volume-meter">
+            <div id="volume-level"></div>
+        </div>
+        <div id="mic-status">Микрофон: неактивен</div>
+        
+        <div id="start-screen">
+            <h1>Fluffi Bird</h1>
+            <p>Управляйте птичкой громкостью голоса!</p>
+            <p>Чем громче говорите, тем выше летит птичка</p>
+            <button id="start-btn">Начать игру</button>
+        </div>
+        
+        <div id="game-over">
+            <h1>Игра окончена!</h1>
+            <p>Ваш счет: <span id="final-score">0</span></p>
+            <button id="restart-btn">Играть снова</button>
+        </div>
+    </div>
+
+    <script>
+        // Game elements
+        const bird = document.getElementById('bird');
+        const gameContainer = document.getElementById('game-container');
+        const scoreElement = document.getElementById('score');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const micStatus = document.getElementById('mic-status');
+        const volumeLevel = document.getElementById('volume-level');
+        
+        // Game variables
+        let gameRunning = false;
+        let score = 0;
+        let birdPosition = 300;
+        let birdVelocity = 0;
+        let gravity = 0.4;
+        let pipes = [];
+        let pipeTimer;
+        let animationFrame;
+        let audioContext;
+        let analyser;
+        let microphone;
+        let isMicActive = false;
+        
+        // Constants
+        const GAME_WIDTH = 400;
+        const GAME_HEIGHT = 600;
+        const BIRD_WIDTH = 40;
+        const BIRD_HEIGHT = 30;
+        const PIPE_WIDTH = 60;
+        const PIPE_GAP = 150;
+        const PIPE_SPEED = 2;
+        const PIPE_INTERVAL = 2000;
+        
+        // Initialize audio context and microphone
+        async function initMicrophone() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                isMicActive = true;
+                micStatus.textContent = "Микрофон: активен";
+                return true;
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                micStatus.textContent = "Микрофон: ошибка доступа";
+                return false;
+            }
+        }
+        
+        // Get current volume level
+        function getVolume() {
+            if (!analyser) return 0;
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            
+            const average = sum / dataArray.length;
+            const normalized = Math.min(average / 255, 1);
+            
+            // Update volume meter
+            volumeLevel.style.width = `${normalized * 100}%`;
+            
+            return normalized;
+        }
+        
+        // Start game
+        function startGame() {
+            if (!gameRunning) {
+                initMicrophone().then(success => {
+                    if (!success) {
+                        alert("Не удалось получить доступ к микрофону. Игра будет использовать клавиши.");
+                    }
+                    
+                    gameRunning = true;
+                    score = 0;
+                    birdPosition = 300;
+                    birdVelocity = 0;
+                    pipes = [];
+                    scoreElement.textContent = "0";
+                    
+                    startScreen.style.display = "none";
+                    gameOverScreen.style.display = "none";
+                    
+                    bird.style.top = birdPosition + "px";
+                    
+                    // Clear existing pipes
+                    document.querySelectorAll('.pipe').forEach(pipe => pipe.remove());
+                    
+                    // Start pipe generation
+                    pipeTimer = setInterval(generatePipe, PIPE_INTERVAL);
+                    
+                    // Start game loop
+                    gameLoop();
+                });
+            }
+        }
+        
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(pipeTimer);
+            cancelAnimationFrame(animationFrame);
+            
+            finalScoreElement.textContent = score;
+            gameOverScreen.style.display = "flex";
+            
+            // Disconnect microphone
+            if (microphone) {
+                microphone.disconnect();
+                isMicActive = false;
+                micStatus.textContent = "Микрофон: неактивен";
+            }
+        }
+        
+        // Generate pipes
+        function generatePipe() {
+            if (!gameRunning) return;
+            
+            const gapPosition = Math.floor(Math.random() * (GAME_HEIGHT - PIPE_GAP - 200)) + 100;
+            
+            const topPipe = document.createElement('div');
+            topPipe.className = 'pipe pipe-top';
+            topPipe.style.height = gapPosition + "px";
+            gameContainer.appendChild(topPipe);
+            
+            const bottomPipe = document.createElement('div');
+            bottomPipe.className = 'pipe pipe-bottom';
+            bottomPipe.style.height = (GAME_HEIGHT - gapPosition - PIPE_GAP) + "px";
+            gameContainer.appendChild(bottomPipe);
+            
+            pipes.push({
+                topElement: topPipe,
+                bottomElement: bottomPipe,
+                x: GAME_WIDTH,
+                topHeight: gapPosition,
+                bottomHeight: GAME_HEIGHT - gapPosition - PIPE_GAP,
+                passed: false
+            });
+        }
+        
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            // Update bird position based on volume
+            const volume = getVolume();
+            
+            // Volume controls bird - louder = higher
+            birdVelocity = -volume * 10;
+            
+            birdPosition += birdVelocity;
+            birdVelocity += gravity;
+            
+            // Apply gravity
+            birdPosition = Math.max(0, Math.min(GAME_HEIGHT - BIRD_HEIGHT, birdPosition));
+            bird.style.top = birdPosition + "px";
+            
+            // Rotate bird based on velocity
+            bird.style.transform = `rotate(${birdVelocity * 3}deg)`;
+            
+            // Update pipes
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                const pipe = pipes[i];
+                pipe.x -= PIPE_SPEED;
+                
+                pipe.topElement.style.right = (GAME_WIDTH - pipe.x - PIPE_WIDTH) + "px";
+                pipe.bottomElement.style.right = (GAME_WIDTH - pipe.x - PIPE_WIDTH) + "px";
+                
+                // Check for collision
+                if (
+                    (50 + BIRD_WIDTH > pipe.x && 50 < pipe.x + PIPE_WIDTH) &&
+                    (birdPosition < pipe.topHeight || birdPosition + BIRD_HEIGHT > GAME_HEIGHT - pipe.bottomHeight)
+                ) {
+                    gameOver();
+                    return;
+                }
+                
+                // Check if pipe passed
+                if (!pipe.passed && pipe.x + PIPE_WIDTH < 50) {
+                    pipe.passed = true;
+                    score++;
+                    scoreElement.textContent = score;
+                }
+                
+                // Remove off-screen pipes
+                if (pipe.x + PIPE_WIDTH < 0) {
+                    pipe.topElement.remove();
+                    pipe.bottomElement.remove();
+                    pipes.splice(i, 1);
+                }
+            }
+            
+            // Check if bird hit ground or ceiling
+            if (birdPosition <= 0 || birdPosition >= GAME_HEIGHT - BIRD_HEIGHT) {
+                gameOver();
+                return;
+            }
+            
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+        
+        // Keyboard fallback controls
+        document.addEventListener('keydown', (e) => {
+            if (gameRunning && !isMicActive) {
+                if (e.code === 'Space' || e.key === 'ArrowUp') {
+                    birdVelocity = -8;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
