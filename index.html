@@ -379,7 +379,7 @@
         const MAX_VOLUME = 0.8;
 
         // 4. Чувствительность — насколько сильно птичка реагирует на голос
-        const SENSITIVITY = 12; // попробуй 8–16
+        const SENSITIVITY = 20;// попробуй 8–16
 
         // 5. Количество облаков на фоне
         const CLOUD_COUNT = 5;
@@ -388,7 +388,7 @@
         const PIPE_SPEED = 3;
 
         // 7. Высота прохода между трубами (в пикселях)
-        const PIPE_GAP = 180;
+        const PIPE_GAP = 200;
 
         // =================================================
 
@@ -466,7 +466,7 @@
             }
             const average = sum / dataArray.length;
             let normalized = Math.min(average / 255, 1);
-            smoothVolume = smoothVolume * 0.7 + normalized * 0.3;
+            smoothVolume = smoothVolume * 0.3 + normalized * 0.7;
             const targetWidth = smoothVolume * 100;
             const currentWidth = parseFloat(volumeLevel.style.width) || 0;
             volumeLevel.style.width = `${currentWidth + (targetWidth - currentWidth) * 0.2}%`;
