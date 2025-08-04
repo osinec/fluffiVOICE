@@ -306,6 +306,23 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
             opacity: 0.8;
         }
+
+        #mic-permission-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 300;
+            display: none;
+            padding: 15px 25px;
+            font-size: 18px;
+            background-color: #FF5722;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -323,7 +340,7 @@
             </div>
             <div id="volume-label">ГРОМКОСТЬ</div>
         </div>
-        <div id="mic-status">🎤 Микрофон: ожидание...</div>
+        <div id="mic-status">🎤 Нажмите "Начать игру" и разрешите доступ к микрофону</div>
         <div id="instructions">Говорите громче чтобы подняться, тише - чтобы опуститься</div>
         
         <div id="start-screen">
@@ -340,6 +357,8 @@
             <p id="final-score" style="font-size: 48px; color: var(--gold); margin: 10px 0;">0</p>
             <button id="restart-btn">ИГРАТЬ СНОВА</button>
         </div>
+
+        <button id="mic-permission-btn">Разрешить доступ к микрофону</button>
     </div>
 
     <script>
@@ -355,6 +374,7 @@
         const micStatus = document.getElementById('mic-status');
         const volumeLevel = document.getElementById('volume-level');
         const volumeLabel = document.getElementById('volume-label');
+        const micPermissionBtn = document.getElementById('mic-permission-btn');
         
         // Game variables
         let gameRunning = false;
@@ -371,21 +391,11 @@
         let isMicActive = false;
         let smoothVolume = 0;
         let clouds = [];
-        
-        // Constants
-        const GAME_WIDTH = 400;
-        const GAME_HEIGHT = 600;
-        const BIRD_WIDTH = 50;
-        const BIRD_HEIGHT = 40;
-        const PIPE_WIDTH = 70;
-        const PIPE_GAP = 180;
-        const PIPE_SPEED = 3;
-        const PIPE_INTERVAL = 1800;
-        const CLOUD_COUNT = 5;
+        let awaitingMicPermission = false;
         
         // Initialize clouds
         function initClouds() {
-            for (let i = 0; i < CLOUD_COUNT; i++) {
+            for (let i = 0; i < 5; i++) {
                 createCloud();
             }
         }
@@ -483,36 +493,57 @@
         // Start game
         function startGame() {
             if (!gameRunning) {
-                initMicrophone().then(success => {
-                    if (!success) {
-                        alert("Не удалось получить доступ к микрофону. Используйте ПРОБЕЛ или СТРЕЛКУ ВВЕРХ для управления.");
-                    }
-                    
-                    gameRunning = true;
-                    score = 0;
-                    birdPosition = 300;
-                    birdVelocity = 0;
-                    pipes = [];
-                    scoreElement.textContent = "0";
-                    
-                    startScreen.style.display = "none";
-                    gameOverScreen.style.display = "none";
-                    
-                    bird.style.top = birdPosition + "px";
-                    bird.style.transform = "rotate(0deg)";
-                    
-                    // Clear existing pipes
-                    document.querySelectorAll('.pipe').forEach(pipe => pipe.remove());
-                    
-                    // Initialize clouds
-                    initClouds();
+                gameRunning = true;
+                score = 0;
+                birdPosition = 300;
+                birdVelocity = 0;
+                pipes = [];
+                scoreElement.textContent = "0";
+                
+                startScreen.style.display = "none";
+                gameOverScreen.style.display = "none";
+                
+                bird.style.top = birdPosition + "px";
+                bird.style.transform = "rotate(0deg)";
+                
+                // Clear existing pipes
+                document.querySelectorAll('.pipe').forEach(pipe => pipe.remove());
+                
+                // Initialize clouds
+                initClouds();
+                
+                // Show microphone permission button
+                awaitingMicPermission = true;
+                micPermissionBtn.style.display = "block";
+                micPermissionBtn.textContent = "Разрешить доступ к микрофону";
+                micStatus.innerHTML = "🎤 Нажмите кнопку выше, чтобы разрешить микрофон";
+            }
+        }
+        
+        // Handle microphone permission
+        async function handleMicPermission() {
+            try {
+                micPermissionBtn.textContent = "Загрузка...";
+                const success = await initMicrophone();
+                
+                if (success) {
+                    micPermissionBtn.style.display = "none";
+                    awaitingMicPermission = false;
                     
                     // Start pipe generation
-                    pipeTimer = setInterval(generatePipe, PIPE_INTERVAL);
+                    pipeTimer = setInterval(generatePipe, 1800);
                     
                     // Start game loop
                     gameLoop();
-                });
+                } else {
+                    micPermissionBtn.textContent = "Микрофон недоступен. Нажмите чтобы попробовать снова";
+                    // Start game with keyboard controls
+                    pipeTimer = setInterval(generatePipe, 1800);
+                    gameLoop();
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                micPermissionBtn.textContent = "Ошибка. Нажмите чтобы попробовать снова";
             }
         }
         
@@ -538,13 +569,17 @@
                 micStatus.innerHTML = "🎤 Микрофон: <span style='color: #FF6347'>неактивен</span>";
                 volumeLabel.style.color = "#FF6347";
             }
+            
+            // Hide permission button if shown
+            micPermissionBtn.style.display = "none";
+            awaitingMicPermission = false;
         }
         
         // Generate pipes with decorative elements
         function generatePipe() {
             if (!gameRunning) return;
             
-            const gapPosition = Math.floor(Math.random() * (GAME_HEIGHT - PIPE_GAP - 250)) + 100;
+            const gapPosition = Math.floor(Math.random() * (600 - 180 - 250)) + 100;
             
             const topPipe = document.createElement('div');
             topPipe.className = 'pipe pipe-top';
@@ -553,63 +588,34 @@
             
             const bottomPipe = document.createElement('div');
             bottomPipe.className = 'pipe pipe-bottom';
-            bottomPipe.style.height = (GAME_HEIGHT - gapPosition - PIPE_GAP) + "px";
+            bottomPipe.style.height = (600 - gapPosition - 180) + "px";
             gameContainer.appendChild(bottomPipe);
-            
-            // Add decorative elements to pipes
-            addPipeDecorations(topPipe, true);
-            addPipeDecorations(bottomPipe, false);
             
             pipes.push({
                 topElement: topPipe,
                 bottomElement: bottomPipe,
-                x: GAME_WIDTH,
+                x: 400,
                 topHeight: gapPosition,
-                bottomHeight: GAME_HEIGHT - gapPosition - PIPE_GAP,
+                bottomHeight: 600 - gapPosition - 180,
                 passed: false
             });
-        }
-        
-        // Add decorations to pipes
-        function addPipeDecorations(pipe, isTop) {
-            const decorationCount = 3;
-            for (let i = 0; i < decorationCount; i++) {
-                const decor = document.createElement('div');
-                decor.style.position = 'absolute';
-                decor.style.width = '20px';
-                decor.style.height = '20px';
-                decor.style.backgroundColor = '#A0522D';
-                decor.style.border = '2px solid #8B4513';
-                decor.style.borderRadius = '50%';
-                
-                if (isTop) {
-                    decor.style.bottom = `${i * 25}px`;
-                } else {
-                    decor.style.top = `${i * 25}px`;
-                }
-                
-                decor.style.left = '50%';
-                decor.style.transform = 'translateX(-50%)';
-                
-                pipe.appendChild(decor);
-            }
         }
         
         // Game loop
         function gameLoop() {
             if (!gameRunning) return;
             
-            // Update bird position based on volume
-            const volume = getVolume();
-            
-            // Volume controls bird - louder = higher
-            birdVelocity = -volume * 12;
+            // Update bird position based on volume or keyboard
+            if (isMicActive) {
+                const volume = getVolume();
+                birdVelocity = -volume * 12;
+            }
             
             birdPosition += birdVelocity;
             birdVelocity += gravity;
             
             // Apply gravity and boundaries
-            birdPosition = Math.max(0, Math.min(GAME_HEIGHT - BIRD_HEIGHT, birdPosition));
+            birdPosition = Math.max(0, Math.min(600 - 40, birdPosition));
             bird.style.top = birdPosition + "px";
             
             // Rotate bird based on velocity
@@ -622,15 +628,15 @@
             // Update pipes
             for (let i = pipes.length - 1; i >= 0; i--) {
                 const pipe = pipes[i];
-                pipe.x -= PIPE_SPEED;
+                pipe.x -= 3;
                 
-                pipe.topElement.style.right = (GAME_WIDTH - pipe.x - PIPE_WIDTH) + "px";
-                pipe.bottomElement.style.right = (GAME_WIDTH - pipe.x - PIPE_WIDTH) + "px";
+                pipe.topElement.style.right = (400 - pipe.x - 70) + "px";
+                pipe.bottomElement.style.right = (400 - pipe.x - 70) + "px";
                 
                 // Check for collision
                 if (
-                    (80 + BIRD_WIDTH > pipe.x && 80 < pipe.x + PIPE_WIDTH) &&
-                    (birdPosition < pipe.topHeight || birdPosition + BIRD_HEIGHT > GAME_HEIGHT - pipe.bottomHeight)
+                    (80 + 50 > pipe.x && 80 < pipe.x + 70) &&
+                    (birdPosition < pipe.topHeight || birdPosition + 40 > 600 - pipe.bottomHeight)
                 ) {
                     // Collision effect
                     bird.style.backgroundColor = '#FF6347';
@@ -643,7 +649,7 @@
                 }
                 
                 // Check if pipe passed
-                if (!pipe.passed && pipe.x + PIPE_WIDTH < 80) {
+                if (!pipe.passed && pipe.x + 70 < 80) {
                     pipe.passed = true;
                     score++;
                     scoreElement.textContent = score;
@@ -656,7 +662,7 @@
                 }
                 
                 // Remove off-screen pipes
-                if (pipe.x + PIPE_WIDTH < 0) {
+                if (pipe.x + 70 < 0) {
                     pipe.topElement.remove();
                     pipe.bottomElement.remove();
                     pipes.splice(i, 1);
@@ -664,7 +670,7 @@
             }
             
             // Check if bird hit ground or ceiling
-            if (birdPosition <= 0 || birdPosition >= GAME_HEIGHT - BIRD_HEIGHT) {
+            if (birdPosition <= 0 || birdPosition >= 600 - 40) {
                 gameOver();
                 return;
             }
@@ -675,18 +681,21 @@
         // Event listeners
         startBtn.addEventListener('click', startGame);
         restartBtn.addEventListener('click', startGame);
+        micPermissionBtn.addEventListener('click', handleMicPermission);
         
         // Keyboard fallback controls
         document.addEventListener('keydown', (e) => {
-            if (gameRunning && !isMicActive) {
+            if (gameRunning) {
                 if (e.code === 'Space' || e.key === 'ArrowUp') {
                     birdVelocity = -8;
+                    e.preventDefault();
                 }
             }
             
             // Start game with space if not running
             if (!gameRunning && e.code === 'Space') {
                 startGame();
+                e.preventDefault();
             }
         });
     </script>
