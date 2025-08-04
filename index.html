@@ -35,7 +35,7 @@
             font-family: 'Poppins', sans-serif;
             overflow: hidden;
             color: var(--black);
-            padding-bottom: 100px;
+            padding-bottom: 100px; /* Место для кнопки микрофона */
         }
         #game-container {
             position: relative;
@@ -275,6 +275,7 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
             opacity: 0.8;
         }
+        /* Кнопка микрофона — теперь вне контейнера и ниже */
         #mic-permission-btn {
             position: fixed;
             bottom: 60px;
@@ -297,6 +298,7 @@
     </style>
 </head>
 <body>
+    <!-- Игровой контейнер -->
     <div id="game-container">
         <div id="score">0</div>
         <div id="bird">
@@ -327,10 +329,11 @@
         </div>
     </div>
 
+    <!-- Кнопка доступа к микрофону — вне контейнера -->
     <button id="mic-permission-btn">Разрешить доступ к микрофону</button>
 
     <script>
-        // Game elements
+        // Элементы игры
         const bird = document.getElementById('bird');
         const gameContainer = document.getElementById('game-container');
         const scoreElement = document.getElementById('score');
@@ -344,14 +347,15 @@
         const volumeLabel = document.getElementById('volume-label');
         const micPermissionBtn = document.getElementById('mic-permission-btn');
 
-        // Game constants
+        // Константы игры
         const GAME_WIDTH = 400;
         const GAME_HEIGHT = 600;
 
-        // Game variables
+        // Переменные игры
         let gameRunning = false;
         let score = 0;
         let birdPosition = 300;
+        let birdVelocity = 0;
         let pipes = [];
         let pipeTimer;
         let animationFrame;
@@ -363,14 +367,39 @@
         let clouds = [];
         let awaitingMicPermission = false;
 
-        // Initialize clouds
+        // ============ ⚙️ НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ ============
+
+        // 1. Гравитация — сила падения птички (чем больше, тем быстрее падает)
+        const GRAVITY = 0.6;
+
+        // 2. Минимальный уровень громкости, при котором птичка начинает подниматься
+        const MIN_VOLUME = 0.2; // ниже — птичка падает
+
+        // 3. Максимальный уровень громкости (выше — птичка не взлетит)
+        const MAX_VOLUME = 0.8;
+
+        // 4. Чувствительность — насколько сильно птичка реагирует на голос
+        const SENSITIVITY = 12; // попробуй 8–16
+
+        // 5. Количество облаков на фоне
+        const CLOUD_COUNT = 5;
+
+        // 6. Скорость движения труб (px за кадр)
+        const PIPE_SPEED = 3;
+
+        // 7. Высота прохода между трубами (в пикселях)
+        const PIPE_GAP = 180;
+
+        // =================================================
+
+        // Инициализация облаков
         function initClouds() {
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < CLOUD_COUNT; i++) {
                 createCloud();
             }
         }
 
-        // Create a single cloud
+        // Создание одного облака
         function createCloud() {
             const cloud = document.createElement('div');
             cloud.className = 'cloud';
@@ -392,7 +421,7 @@
             });
         }
 
-        // Update clouds position
+        // Обновление позиции облаков
         function updateClouds() {
             for (let i = clouds.length - 1; i >= 0; i--) {
                 const cloud = clouds[i];
@@ -405,7 +434,7 @@
             }
         }
 
-        // Initialize audio context and microphone
+        // Инициализация микрофона
         async function initMicrophone() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -426,7 +455,7 @@
             }
         }
 
-        // Get current volume level with smoothing
+        // Получение уровня громкости
         function getVolume() {
             if (!analyser) return 0;
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -444,12 +473,13 @@
             return smoothVolume;
         }
 
-        // Start game
+        // Начало игры
         function startGame() {
             if (!gameRunning) {
                 gameRunning = true;
                 score = 0;
                 birdPosition = 300;
+                birdVelocity = 0;
                 pipes = [];
                 scoreElement.textContent = "0";
                 startScreen.style.display = "none";
@@ -465,7 +495,7 @@
             }
         }
 
-        // Handle microphone permission
+        // Обработка разрешения микрофона
         async function handleMicPermission() {
             try {
                 micPermissionBtn.textContent = "Загрузка...";
@@ -476,7 +506,7 @@
                     pipeTimer = setInterval(generatePipe, 1800);
                     gameLoop();
                 } else {
-                    micPermissionBtn.textContent = "Микрофон недоступен. Попробуйте снова";
+                    micPermissionBtn.textContent = "Микрофон недоступен. Игра на клавиши";
                     pipeTimer = setInterval(generatePipe, 1800);
                     gameLoop();
                 }
@@ -486,7 +516,7 @@
             }
         }
 
-        // Game over
+        // Конец игры
         function gameOver() {
             gameRunning = false;
             clearInterval(pipeTimer);
@@ -507,61 +537,64 @@
             awaitingMicPermission = false;
         }
 
-        // Generate pipes
+        // Создание труб
         function generatePipe() {
             if (!gameRunning) return;
-            const gapPosition = Math.floor(Math.random() * (600 - 180 - 250)) + 100;
+            const gapPosition = Math.floor(Math.random() * (600 - PIPE_GAP - 250)) + 100;
             const topPipe = document.createElement('div');
             topPipe.className = 'pipe pipe-top';
             topPipe.style.height = gapPosition + "px";
             gameContainer.appendChild(topPipe);
             const bottomPipe = document.createElement('div');
             bottomPipe.className = 'pipe pipe-bottom';
-            bottomPipe.style.height = (600 - gapPosition - 180) + "px";
+            bottomPipe.style.height = (600 - gapPosition - PIPE_GAP) + "px";
             gameContainer.appendChild(bottomPipe);
             pipes.push({
                 topElement: topPipe,
                 bottomElement: bottomPipe,
                 x: 400,
                 topHeight: gapPosition,
-                bottomHeight: 600 - gapPosition - 180,
+                bottomHeight: 600 - gapPosition - PIPE_GAP,
                 passed: false
             });
         }
 
-        // Game loop
+        // Главный игровой цикл
         function gameLoop() {
             if (!gameRunning) return;
 
+            // Управление голосом
             if (isMicActive) {
-                const volume = getVolume();
-
-                // Полностью убираем гравитацию — позиция зависит ТОЛЬКО от громкости
-                // Громкость от 0 до 1 → позиция от 500px (низ) до 100px (верх)
-                birdPosition = 500 - volume * 400; // 0 → 500, 1 → 100
-
-                // Ограничиваем, чтобы не выходить за пределы экрана
-                birdPosition = Math.max(0, Math.min(600 - 40, birdPosition));
+                const rawVolume = getVolume();
+                const clampedVolume = Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, rawVolume));
+                const normalizedVolume = (clampedVolume - MIN_VOLUME) / (MAX_VOLUME - MIN_VOLUME);
+                birdVelocity = -normalizedVolume * SENSITIVITY;
             }
 
-            // Обновляем позицию птички
-            bird.style.top = birdPosition + "px";
+            // Применяем гравитацию
+            birdVelocity += GRAVITY;
+            birdPosition += birdVelocity;
 
-            // Поворот в зависимости от уровня громкости
-            const rotation = Math.max(-30, Math.min(30, (0.5 - smoothVolume) * 60));
+            // Ограничиваем позицию птички
+            if (birdPosition <= 0 || birdPosition >= 600 - 40) {
+                gameOver();
+                return;
+            }
+
+            bird.style.top = birdPosition + "px";
+            const rotation = Math.max(-30, Math.min(30, birdVelocity * 3));
             bird.style.transform = `rotate(${rotation}deg)`;
 
-            // Обновляем облака
             updateClouds();
 
-            // Обновляем трубы
+            // Обновление труб
             for (let i = pipes.length - 1; i >= 0; i--) {
                 const pipe = pipes[i];
-                pipe.x -= 3;
+                pipe.x -= PIPE_SPEED;
                 pipe.topElement.style.right = (400 - pipe.x - 70) + "px";
                 pipe.bottomElement.style.right = (400 - pipe.x - 70) + "px";
 
-                // Проверка столкновения с трубами — ЕДИНСТВЕННАЯ причина проигрыша
+                // Проверка столкновения
                 if (
                     (80 + 50 > pipe.x && 80 < pipe.x + 70) &&
                     (birdPosition < pipe.topHeight || birdPosition + 40 > 600 - pipe.bottomHeight)
@@ -596,12 +629,12 @@
             animationFrame = requestAnimationFrame(gameLoop);
         }
 
-        // Event listeners
+        // Обработчики событий
         startBtn.addEventListener('click', startGame);
         restartBtn.addEventListener('click', startGame);
         micPermissionBtn.addEventListener('click', handleMicPermission);
 
-        // Клавиатурное управление (на всякий случай)
+        // Управление с клавиатуры
         document.addEventListener('keydown', (e) => {
             if (!gameRunning && e.code === 'Space') {
                 startGame();
