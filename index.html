@@ -1,646 +1,115 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fluffi Bird - Управляй голосом!</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-        :root {
-            --sky-blue: #87CEEB;
-            --light-sky: #E0F7FA;
-            --gold: #FFD700;
-            --dark-gold: #FFC600;
-            --orange: #FF8C00;
-            --red: #FF6347;
-            --green: #2E8B57;
-            --light-green: #228B22;
-            --white: #FFFFFF;
-            --black: #333333;
-            --shadow: rgba(0, 0, 0, 0.2);
-        }
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, var(--sky-blue), var(--light-sky));
-            font-family: 'Poppins', sans-serif;
-            overflow: hidden;
-            color: var(--black);
-            padding-bottom: 100px; /* Место для кнопки микрофона */
-        }
-        #game-container {
-            position: relative;
-            width: 400px;
-            height: 600px;
-            background: linear-gradient(to bottom, #7FB2E9, #A9D4F5);
-            border: 4px solid var(--black);
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px var(--shadow);
-        }
-        #bird {
-            position: absolute;
-            width: 50px;
-            height: 40px;
-            background-color: var(--gold);
-            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-            left: 80px;
-            top: 300px;
-            z-index: 10;
-            transition: transform 0.1s ease-out;
-            box-shadow: 3px 3px 6px var(--shadow);
-        }
-        #bird:before {
-            content: '';
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background-color: var(--red);
-            border-radius: 50%;
-            top: 8px;
-            right: 8px;
-            border: 2px solid var(--white);
-        }
-        #bird:after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 10px;
-            background-color: var(--orange);
-            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-            bottom: -4px;
-            right: -6px;
-            transform: rotate(-30deg);
-        }
-        .eye {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            background-color: var(--black);
-            border-radius: 50%;
-            top: 10px;
-            right: 10px;
-        }
-        .wing {
-            position: absolute;
-            width: 30px;
-            height: 15px;
-            background-color: var(--dark-gold);
-            border-radius: 50%;
-            top: 15px;
-            left: -10px;
-            transform-origin: right center;
-            animation: flap 0.3s infinite alternate;
-        }
-        @keyframes flap {
-            0% { transform: rotate(-10deg); }
-            100% { transform: rotate(30deg); }
-        }
-        .pipe {
-            position: absolute;
-            width: 70px;
-            background: linear-gradient(to right, var(--green), var(--light-green));
-            border: 3px solid var(--black);
-            border-radius: 8px;
-            right: -70px;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
-            transition: right 0.05s linear;
-        }
-        .pipe-top {
-            top: 0;
-            border-bottom: none;
-            border-radius: 8px 8px 0 0;
-        }
-        .pipe-bottom {
-            bottom: 0;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-        }
-        .pipe-top:after, .pipe-bottom:after {
-            content: '';
-            position: absolute;
-            width: 80px;
-            height: 30px;
-            background: linear-gradient(to right, var(--green), var(--light-green));
-            border: 3px solid var(--black);
-            border-top: none;
-            left: -5px;
-        }
-        .pipe-top:after {
-            bottom: -30px;
-            border-radius: 0 0 8px 8px;
-        }
-        .pipe-bottom:after {
-            top: -30px;
-            border-radius: 8px 8px 0 0;
-            border-bottom: none;
-        }
-        #score {
-            position: absolute;
-            top: 30px;
-            left: 30px;
-            font-size: 28px;
-            font-weight: bold;
-            color: var(--white);
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            z-index: 100;
-        }
-        #start-screen, #game-over {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: var(--white);
-            z-index: 200;
-            text-align: center;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-        #game-over {
-            display: none;
-            background-color: rgba(0, 0, 0, 0.8);
-        }
-        h1 {
-            font-size: 36px;
-            margin-bottom: 20px;
-            color: var(--gold);
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        p {
-            font-size: 18px;
-            margin-bottom: 10px;
-            max-width: 80%;
-        }
-        button {
-            padding: 12px 30px;
-            font-size: 18px;
-            font-weight: bold;
-            background-color: var(--gold);
-            border: none;
-            border-radius: 30px;
-            cursor: pointer;
-            margin-top: 30px;
-            color: var(--black);
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        button:hover {
-            background-color: var(--dark-gold);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-        }
-        button:active {
-            transform: translateY(1px);
-        }
-        #mic-status {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            color: var(--white);
-            font-size: 16px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 8px 15px;
-            border-radius: 20px;
-        }
-        #volume-container {
-            position: absolute;
-            bottom: 70px;
-            left: 30px;
-            width: 200px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        #volume-meter {
-            width: 100%;
-            height: 15px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 5px;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-        }
-        #volume-level {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(to right, #4CAF50, #8BC34A);
-            border-radius: 10px;
-            transition: width 0.1s;
-        }
-        #volume-label {
-            color: var(--white);
-            font-size: 14px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-        .cloud {
-            position: absolute;
-            background-color: rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            filter: blur(5px);
-            z-index: 1;
-        }
-        #ground {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 30px;
-            background: linear-gradient(to right, #8B4513, #A0522D);
-            border-top: 3px solid var(--black);
-            z-index: 5;
-        }
-        #instructions {
-            position: absolute;
-            bottom: 120px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            color: var(--white);
-            font-size: 14px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            opacity: 0.8;
-        }
-        /* Кнопка микрофона — теперь вне контейнера и ниже */
-        #mic-permission-btn {
-            position: fixed;
-            bottom: 60px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 300;
-            display: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            font-weight: bold;
-            background-color: #FF5722;
-            color: white;
-            border: none;
-            border-radius: 30px;
-            cursor: pointer;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-            max-width: 80%;
-            width: auto;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Динозавр и звук</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #c0c0c0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #dino {
+      width: 80px;
+      height: 100px;
+      background-image: url('https://raw.githubusercontent.com/GoogleChrome/chrome-dino/master/assets/images/dino.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      filter: grayscale(100%) contrast(0);
+      position: absolute;
+      bottom: 100px;
+      left: 50px;
+      transition: left 0.1s ease;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+
+    #permission {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #000;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-    <!-- Игровой контейнер -->
-    <div id="game-container">
-        <div id="score">0</div>
-        <div id="bird">
-            <div class="eye"></div>
-            <div class="wing"></div>
-        </div>
-        <div id="ground"></div>
-        <div id="volume-container">
-            <div id="volume-meter">
-                <div id="volume-level"></div>
-            </div>
-            <div id="volume-label">ГРОМКОСТЬ</div>
-        </div>
-        <div id="mic-status">🎤 Нажмите "Начать игру" и разрешите доступ к микрофону</div>
-        <div id="instructions">Говорите громче чтобы подняться, тише - чтобы опуститься</div>
-        <div id="start-screen">
-            <h1>Fluffi Bird</h1>
-            <p>Управляйте птичкой с помощью своего голоса!</p>
-            <p>Чем громче вы говорите, тем выше поднимается птичка.</p>
-            <p>Пролетайте между трубами и набирайте очки!</p>
-            <button id="start-btn">НАЧАТЬ ИГРУ</button>
-        </div>
-        <div id="game-over">
-            <h1>Игра Окончена!</h1>
-            <p>Ваш результат:</p>
-            <p id="final-score" style="font-size: 48px; color: var(--gold); margin: 10px 0;">0</p>
-            <button id="restart-btn">ИГРАТЬ СНОВА</button>
-        </div>
-    </div>
+  <div id="dino"></div>
+  <div id="status">Ожидание разрешения на микрофон...</div>
+  <button id="permission">Разрешить микрофон</button>
 
-    <!-- Кнопка доступа к микрофону — вне контейнера -->
-    <button id="mic-permission-btn">Разрешить доступ к микрофону</button>
+  <script>
+    const dino = document.getElementById('dino');
+    const statusText = document.getElementById('status');
+    const permissionBtn = document.getElementById('permission');
+    let dinoPosition = 50; // начальная позиция в px
+    const maxPosition = window.innerWidth - 100; // предел экрана
 
-    <script>
-        // Элементы игры
-        const bird = document.getElementById('bird');
-        const gameContainer = document.getElementById('game-container');
-        const scoreElement = document.getElementById('score');
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over');
-        const finalScoreElement = document.getElementById('final-score');
-        const startBtn = document.getElementById('start-btn');
-        const restartBtn = document.getElementById('restart-btn');
-        const micStatus = document.getElementById('mic-status');
-        const volumeLevel = document.getElementById('volume-level');
-        const volumeLabel = document.getElementById('volume-label');
-        const micPermissionBtn = document.getElementById('mic-permission-btn');
+    // Анализатор громкости
+    let audioContext, analyser, microphone, dataArray;
 
-        // Константы игры
-        const GAME_WIDTH = 400;
-        const GAME_HEIGHT = 600;
+    // Функция запуска микрофона
+    async function startMicrophone() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setupAudioStream(stream);
+        permissionBtn.style.display = 'none';
+        statusText.textContent = 'Говорите — динозавр пошёл!';
+      } catch (err) {
+        statusText.textContent = 'Ошибка доступа к микрофону: ' + err.message;
+      }
+    }
 
-        // Переменные игры
-        let gameRunning = false;
-        let score = 0;
-        let birdPosition = 300;
-        let birdVelocity = 0;
-        let pipes = [];
-        let pipeTimer;
-        let animationFrame;
-        let audioContext;
-        let analyser;
-        let microphone;
-        let isMicActive = false;
-        let smoothVolume = 0;
-        let clouds = [];
-        let awaitingMicPermission = false;
+    function setupAudioStream(stream) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
 
-        // ============ ⚙️ НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ ============
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
 
-        // 1. Гравитация — сила падения птички (чем больше, тем быстрее падает)
-        const GRAVITY = 0.6;
+      // Запускаем анализ каждые 100мс
+      updateVolume();
+    }
 
-        // 2. Минимальный уровень громкости, при котором птичка начинает подниматься
-        const MIN_VOLUME = 0.1; // ниже — птичка падает
+    function updateVolume() {
+      analyser.getByteFrequencyData(dataArray);
 
-        // 3. Максимальный уровень громкости (выше — птичка не взлетит)
-        const MAX_VOLUME = 0.2;
+      // Усреднённая громкость
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
 
-        // 4. Чувствительность — насколько сильно птичка реагирует на голос
-        const SENSITIVITY = 10000;// попробуй 8–16
+      // Порог чувствительности
+      if (average > 50 && dinoPosition < maxPosition) {
+        dinoPosition += 10;
+        dino.style.left = dinoPosition + 'px';
+        statusText.textContent = 'Звук обнаружен! Динозавр идёт.';
+      } else {
+        statusText.textContent = 'Тишина... Жду звук.';
+      }
 
-        // 5. Количество облаков на фоне
-        const CLOUD_COUNT = 5;
+      // Продолжаем цикл
+      requestAnimationFrame(updateVolume);
+    }
 
-        // 6. Скорость движения труб (px за кадр)
-        const PIPE_SPEED = 3;
-
-        // 7. Высота прохода между трубами (в пикселях)
-        const PIPE_GAP = 200;
-
-        // =================================================
-
-        // Инициализация облаков
-        function initClouds() {
-            for (let i = 0; i < CLOUD_COUNT; i++) {
-                createCloud();
-            }
-        }
-
-        // Создание одного облака
-        function createCloud() {
-            const cloud = document.createElement('div');
-            cloud.className = 'cloud';
-            const size = Math.random() * 50 + 50;
-            const posX = Math.random() * GAME_WIDTH;
-            const posY = Math.random() * (GAME_HEIGHT - 200);
-            const opacity = Math.random() * 0.5 + 0.3;
-            const speed = Math.random() * 0.5 + 0.2;
-            cloud.style.width = `${size}px`;
-            cloud.style.height = `${size * 0.6}px`;
-            cloud.style.left = `${posX}px`;
-            cloud.style.top = `${posY}px`;
-            cloud.style.opacity = opacity;
-            gameContainer.appendChild(cloud);
-            clouds.push({
-                element: cloud,
-                speed: speed,
-                x: posX
-            });
-        }
-
-        // Обновление позиции облаков
-        function updateClouds() {
-            for (let i = clouds.length - 1; i >= 0; i--) {
-                const cloud = clouds[i];
-                cloud.x -= cloud.speed;
-                if (cloud.x < -100) {
-                    cloud.x = GAME_WIDTH + 50;
-                    cloud.element.style.top = `${Math.random() * (GAME_HEIGHT - 200)}px`;
-                }
-                cloud.element.style.left = `${cloud.x}px`;
-            }
-        }
-
-        // Инициализация микрофона
-        async function initMicrophone() {
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                isMicActive = true;
-                micStatus.innerHTML = "🎤 Микрофон: <span style='color: #4CAF50'>активен</span>";
-                volumeLabel.style.color = "#4CAF50";
-                return true;
-            } catch (error) {
-                console.error("Error accessing microphone:", error);
-                micStatus.innerHTML = "🎤 Микрофон: <span style='color: #FF6347'>недоступен</span>";
-                volumeLabel.style.color = "#FF6347";
-                return false;
-            }
-        }
-
-        // Получение уровня громкости
-        function getVolume() {
-            if (!analyser) return 0;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
-            }
-            const average = sum / dataArray.length;
-            let normalized = Math.min(average / 255, 1);
-            smoothVolume = smoothVolume * 0.3 + normalized * 0.7;
-            const targetWidth = smoothVolume * 100;
-            const currentWidth = parseFloat(volumeLevel.style.width) || 0;
-            volumeLevel.style.width = `${currentWidth + (targetWidth - currentWidth) * 0.2}%`;
-            return smoothVolume;
-        }
-
-        // Начало игры
-        function startGame() {
-            if (!gameRunning) {
-                gameRunning = true;
-                score = 0;
-                birdPosition = 300;
-                birdVelocity = 0;
-                pipes = [];
-                scoreElement.textContent = "0";
-                startScreen.style.display = "none";
-                gameOverScreen.style.display = "none";
-                bird.style.top = birdPosition + "px";
-                bird.style.transform = "rotate(0deg)";
-                document.querySelectorAll('.pipe').forEach(pipe => pipe.remove());
-                initClouds();
-                awaitingMicPermission = true;
-                micPermissionBtn.style.display = "block";
-                micPermissionBtn.textContent = "Разрешить доступ к микрофону";
-                micStatus.innerHTML = "🎤 Нажмите кнопку ниже, чтобы разрешить микрофон";
-            }
-        }
-
-        // Обработка разрешения микрофона
-        async function handleMicPermission() {
-            try {
-                micPermissionBtn.textContent = "Загрузка...";
-                const success = await initMicrophone();
-                if (success) {
-                    micPermissionBtn.style.display = "none";
-                    awaitingMicPermission = false;
-                    pipeTimer = setInterval(generatePipe, 1800);
-                    gameLoop();
-                } else {
-                    micPermissionBtn.textContent = "Микрофон недоступен. Игра на клавиши";
-                    pipeTimer = setInterval(generatePipe, 1800);
-                    gameLoop();
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                micPermissionBtn.textContent = "Ошибка. Попробуйте снова";
-            }
-        }
-
-        // Конец игры
-        function gameOver() {
-            gameRunning = false;
-            clearInterval(pipeTimer);
-            cancelAnimationFrame(animationFrame);
-            finalScoreElement.textContent = score;
-            gameOverScreen.style.display = "flex";
-            finalScoreElement.style.transform = "scale(1.2)";
-            setTimeout(() => {
-                finalScoreElement.style.transform = "scale(1)";
-            }, 300);
-            if (microphone) {
-                microphone.disconnect();
-                isMicActive = false;
-                micStatus.innerHTML = "🎤 Микрофон: <span style='color: #FF6347'>неактивен</span>";
-                volumeLabel.style.color = "#FF6347";
-            }
-            micPermissionBtn.style.display = "none";
-            awaitingMicPermission = false;
-        }
-
-        // Создание труб
-        function generatePipe() {
-            if (!gameRunning) return;
-            const gapPosition = Math.floor(Math.random() * (600 - PIPE_GAP - 250)) + 100;
-            const topPipe = document.createElement('div');
-            topPipe.className = 'pipe pipe-top';
-            topPipe.style.height = gapPosition + "px";
-            gameContainer.appendChild(topPipe);
-            const bottomPipe = document.createElement('div');
-            bottomPipe.className = 'pipe pipe-bottom';
-            bottomPipe.style.height = (600 - gapPosition - PIPE_GAP) + "px";
-            gameContainer.appendChild(bottomPipe);
-            pipes.push({
-                topElement: topPipe,
-                bottomElement: bottomPipe,
-                x: 400,
-                topHeight: gapPosition,
-                bottomHeight: 600 - gapPosition - PIPE_GAP,
-                passed: false
-            });
-        }
-
-        // Главный игровой цикл
-        function gameLoop() {
-            if (!gameRunning) return;
-
-            // Управление голосом
-            if (isMicActive) {
-                const rawVolume = getVolume();
-                const clampedVolume = Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, rawVolume));
-                const normalizedVolume = (clampedVolume - MIN_VOLUME) / (MAX_VOLUME - MIN_VOLUME);
-                birdVelocity = -normalizedVolume * SENSITIVITY;
-            }
-
-            // Применяем гравитацию
-            birdVelocity += GRAVITY;
-            birdPosition += birdVelocity;
-
-            // Ограничиваем позицию птички
-            if (birdPosition <= 0 || birdPosition >= 600 - 40) {
-                gameOver();
-                return;
-            }
-
-            bird.style.top = birdPosition + "px";
-            const rotation = Math.max(-30, Math.min(30, birdVelocity * 3));
-            bird.style.transform = `rotate(${rotation}deg)`;
-
-            updateClouds();
-
-            // Обновление труб
-            for (let i = pipes.length - 1; i >= 0; i--) {
-                const pipe = pipes[i];
-                pipe.x -= PIPE_SPEED;
-                pipe.topElement.style.right = (400 - pipe.x - 70) + "px";
-                pipe.bottomElement.style.right = (400 - pipe.x - 70) + "px";
-
-                // Проверка столкновения
-                if (
-                    (80 + 50 > pipe.x && 80 < pipe.x + 70) &&
-                    (birdPosition < pipe.topHeight || birdPosition + 40 > 600 - pipe.bottomHeight)
-                ) {
-                    bird.style.backgroundColor = '#FF6347';
-                    setTimeout(() => {
-                        if (gameRunning) bird.style.backgroundColor = '#FFD700';
-                    }, 100);
-                    gameOver();
-                    return;
-                }
-
-                // Прохождение трубы
-                if (!pipe.passed && pipe.x + 70 < 80) {
-                    pipe.passed = true;
-                    score++;
-                    scoreElement.textContent = score;
-                    scoreElement.style.transform = 'scale(1.3)';
-                    setTimeout(() => {
-                        scoreElement.style.transform = 'scale(1)';
-                    }, 200);
-                }
-
-                // Удаление ушедших труб
-                if (pipe.x + 70 < 0) {
-                    pipe.topElement.remove();
-                    pipe.bottomElement.remove();
-                    pipes.splice(i, 1);
-                }
-            }
-
-            animationFrame = requestAnimationFrame(gameLoop);
-        }
-
-        // Обработчики событий
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
-        micPermissionBtn.addEventListener('click', handleMicPermission);
-
-        // Управление с клавиатуры
-        document.addEventListener('keydown', (e) => {
-            if (!gameRunning && e.code === 'Space') {
-                startGame();
-                e.preventDefault();
-            }
-        });
-    </script>
+    // Кнопка разрешения
+    permissionBtn.addEventListener('click', startMicrophone);
+  </script>
 </body>
 </html>
