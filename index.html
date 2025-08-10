@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой динозавр</title>
+    <title>Голосовой динозавр с рельефом</title>
     <style>
         body {
             margin: 0;
@@ -16,24 +16,48 @@
             position: relative;
             width: 100vw;
             height: 100vh;
+            overflow: hidden;
         }
         
         #dino {
             position: absolute;
             left: 50px;
-            bottom: 100px;
+            bottom: 150px;
             width: 80px;
             height: 86px;
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
             background-repeat: no-repeat;
+            z-index: 10;
+            transition: bottom 0.3s ease;
         }
         
-        #ground {
+        #road {
             position: absolute;
             bottom: 0;
-            width: 100%;
-            height: 30px;
-            background-color: #333;
+            width: 200%;
+            height: 150px;
+            background-color: #654321;
+            z-index: 5;
+        }
+        
+        #road-middle {
+            position: absolute;
+            bottom: 60px;
+            left: 0;
+            width: 200%;
+            height: 5px;
+            background-color: white;
+            z-index: 6;
+        }
+        
+        .terrain {
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 150px;
+            background-color: #8B4513;
+            clip-path: polygon(0% 100%, 0% 50%, 5% 55%, 10% 40%, 15% 60%, 20% 30%, 25% 70%, 30% 20%, 35% 80%, 40% 10%, 45% 90%, 50% 0%, 55% 100%, 60% 50%, 65% 70%, 70% 30%, 75% 80%, 80% 20%, 85% 90%, 90% 10%, 95% 95%, 100% 50%, 100% 100%);
+            z-index: 4;
         }
         
         #status {
@@ -45,6 +69,7 @@
             background-color: rgba(255, 255, 255, 0.7);
             padding: 5px 10px;
             border-radius: 5px;
+            z-index: 20;
         }
         
         #instructions {
@@ -56,6 +81,8 @@
             background-color: rgba(255, 255, 255, 0.9);
             padding: 20px;
             border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 20;
         }
         
         button {
@@ -66,22 +93,65 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        #volume-display {
+            height: 20px;
+            width: 100%;
+            background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+            margin-top: 10px;
+            border-radius: 5px;
+            position: relative;
+        }
+        
+        #volume-level {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background-color: rgba(255,255,255,0.5);
         }
         
         #error-message {
             color: red;
             margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        #terrain-info {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            font-size: 16px;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 20;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="status">Нажмите кнопку ниже</div>
+        <div id="status">Статус: Нажмите "Включить микрофон"</div>
+        <div id="terrain-info">Рельеф: ровный</div>
+        <div class="terrain"></div>
+        <div id="road"></div>
+        <div id="road-middle"></div>
         <div id="dino"></div>
-        <div id="ground"></div>
         <div id="instructions">
-            <h2>Голосовой динозавр</h2>
-            <p>Говорите - динозавр бежит, молчите - останавливается</p>
+            <h2>Голосовой динозавр с рельефом</h2>
+            <p>Управляйте динозавром громкостью голоса:</p>
+            <ul style="text-align: left;">
+                <li>Обычная громкость - средняя полоса</li>
+                <li>Громче - подъем в гору</li>
+                <li>Тише - спуск с горы</li>
+            </ul>
+            <div id="volume-display">
+                <div id="volume-level"></div>
+            </div>
             <button id="start-btn">Включить микрофон</button>
             <div id="error-message"></div>
         </div>
@@ -93,30 +163,30 @@
         const startBtn = document.getElementById('start-btn');
         const instructions = document.getElementById('instructions');
         const errorMessage = document.getElementById('error-message');
+        const volumeLevel = document.getElementById('volume-level');
+        const terrainInfo = document.getElementById('terrain-info');
+        const road = document.getElementById('road');
+        const roadMiddle = document.getElementById('road-middle');
         
         let audioContext;
         let analyser;
         let microphone;
         let isMoving = false;
         let animationId;
+        let roadPosition = 0;
+        let currentTerrain = 'flat'; // flat, uphill, downhill
+        let terrainChangeTimer = 0;
+        let averageVolume = 0;
         
-        // Проверка поддержки Web Audio API
+        // Проверка поддержки API
         if (!window.AudioContext && !window.webkitAudioContext) {
             showError("Ваш браузер не поддерживает Web Audio API");
             startBtn.disabled = true;
         }
         
-        // Проверка поддержки getUserMedia
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             showError("Ваш браузер не поддерживает доступ к микрофону");
             startBtn.disabled = true;
-        } else {
-            // Проверка HTTPS/localhost
-            if (window.location.protocol !== 'https:' && 
-                window.location.hostname !== 'localhost' && 
-                window.location.hostname !== '127.0.0.1') {
-                showError("Для работы микрофона откройте страницу через HTTPS или локально");
-            }
         }
         
         startBtn.addEventListener('click', initAudio);
@@ -132,7 +202,6 @@
             statusDisplay.textContent = "Запрос доступа к микрофону...";
             errorMessage.textContent = "";
             
-            // Очистка предыдущих подключений
             if (microphone) microphone.disconnect();
             if (audioContext) audioContext.close();
             
@@ -159,7 +228,6 @@
             microphone = audioContext.createMediaStreamSource(stream);
             microphone.connect(analyser);
             
-            // Обработка отключения микрофона
             stream.getAudioTracks()[0].onended = () => {
                 showError("Микрофон был отключен");
                 resetGame();
@@ -190,28 +258,25 @@
         function startAnimation() {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
-            let dinoPosition = 50;
             
             function animate() {
                 analyser.getByteFrequencyData(dataArray);
                 
-                // Вычисляем средний уровень звука
+                // Вычисляем уровень громкости
                 let sum = dataArray.reduce((a, b) => a + b, 0);
-                let average = sum / bufferLength;
+                averageVolume = sum / bufferLength;
                 
-                if (average > 10) { // Порог активации
-                    if (!isMoving) {
-                        isMoving = true;
-                        statusDisplay.textContent = "Динозавр бежит!";
-                    }
-                    dinoPosition += 3;
-                    dino.style.left = dinoPosition + "px";
-                } else {
-                    if (isMoving) {
-                        isMoving = false;
-                        statusDisplay.textContent = "Тишина - динозавр остановился";
-                    }
-                }
+                // Обновляем индикатор громкости
+                updateVolumeDisplay(averageVolume);
+                
+                // Определяем текущий рельеф
+                determineTerrain();
+                
+                // Управление динозавром
+                controlDino();
+                
+                // Движение дороги
+                moveRoad();
                 
                 animationId = requestAnimationFrame(animate);
             }
@@ -219,19 +284,121 @@
             animate();
         }
         
+        function updateVolumeDisplay(volume) {
+            const maxVolume = 100; // Максимальный ожидаемый уровень
+            const level = Math.min(volume / maxVolume * 100, 100);
+            volumeLevel.style.width = level + '%';
+            
+            // Цвет индикатора
+            if (level < 30) {
+                volumeLevel.style.backgroundColor = 'rgba(0,255,0,0.5)';
+            } else if (level < 70) {
+                volumeLevel.style.backgroundColor = 'rgba(255,255,0,0.5)';
+            } else {
+                volumeLevel.style.backgroundColor = 'rgba(255,0,0,0.5)';
+            }
+        }
+        
+        function determineTerrain() {
+            // Меняем рельеф каждые 5 секунд
+            terrainChangeTimer++;
+            if (terrainChangeTimer > 300) { // ~5 сек при 60fps
+                terrainChangeTimer = 0;
+                const terrains = ['flat', 'uphill', 'downhill'];
+                currentTerrain = terrains[Math.floor(Math.random() * terrains.length)];
+                
+                switch(currentTerrain) {
+                    case 'flat':
+                        terrainInfo.textContent = "Рельеф: ровный";
+                        break;
+                    case 'uphill':
+                        terrainInfo.textContent = "Рельеф: подъем в гору";
+                        break;
+                    case 'downhill':
+                        terrainInfo.textContent = "Рельеф: спуск с горы";
+                        break;
+                }
+            }
+        }
+        
+        function controlDino() {
+            const baseLine = 150; // Базовая позиция (ровная дорога)
+            let targetPosition = baseLine;
+            
+            // Определяем целевую позицию в зависимости от рельефа
+            switch(currentTerrain) {
+                case 'flat':
+                    // Для ровной дороги нужно поддерживать среднюю громкость
+                    if (averageVolume > 30 && averageVolume < 70) {
+                        isMoving = true;
+                        targetPosition = baseLine;
+                    } else {
+                        isMoving = false;
+                    }
+                    break;
+                    
+                case 'uphill':
+                    // Для подъема нужно говорить громче
+                    if (averageVolume > 60) {
+                        isMoving = true;
+                        targetPosition = baseLine - 60; // Поднимаем динозавра
+                    } else {
+                        isMoving = false;
+                    }
+                    break;
+                    
+                case 'downhill':
+                    // Для спуска нужно говорить тише
+                    if (averageVolume > 10 && averageVolume < 40) {
+                        isMoving = true;
+                        targetPosition = baseLine + 40; // Опускаем динозавра
+                    } else {
+                        isMoving = false;
+                    }
+                    break;
+            }
+            
+            // Обновляем статус
+            if (isMoving) {
+                statusDisplay.textContent = "Динозавр бежит!";
+            } else {
+                statusDisplay.textContent = "Нужно говорить " + 
+                    (currentTerrain === 'uphill' ? "громче!" : 
+                     currentTerrain === 'downhill' ? "тише!" : "нормальной громкостью");
+            }
+            
+            // Плавное перемещение динозавра
+            const currentBottom = parseInt(dino.style.bottom) || baseLine;
+            dino.style.bottom = (currentBottom + (targetPosition - currentBottom) * 0.1) + 'px';
+        }
+        
+        function moveRoad() {
+            if (isMoving) {
+                roadPosition -= 3;
+                if (roadPosition <= -window.innerWidth) roadPosition = 0;
+                
+                road.style.left = roadPosition + 'px';
+                roadMiddle.style.left = roadPosition + 'px';
+            }
+        }
+        
         function resetGame() {
             if (animationId) cancelAnimationFrame(animationId);
             if (microphone) microphone.disconnect();
             if (audioContext) audioContext.close();
             
-            dino.style.left = "50px";
+            dino.style.bottom = "150px";
             instructions.style.display = "block";
             startBtn.disabled = false;
             startBtn.textContent = "Попробовать снова";
             isMoving = false;
+            currentTerrain = 'flat';
+            terrainInfo.textContent = "Рельеф: ровный";
+            roadPosition = 0;
+            road.style.left = "0px";
+            roadMiddle.style.left = "0px";
         }
         
-        // Очистка при закрытии страницы
         window.addEventListener('beforeunload', resetGame);
     </script>
 </body>
