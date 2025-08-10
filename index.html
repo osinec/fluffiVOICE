@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice-Activated Chrome Dino</title>
+    <title>Голосовой динозавр</title>
     <style>
         body {
             margin: 0;
@@ -16,7 +16,6 @@
             position: relative;
             width: 100vw;
             height: 100vh;
-            overflow: hidden;
         }
         
         #dino {
@@ -27,26 +26,14 @@
             height: 86px;
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
             background-repeat: no-repeat;
-            z-index: 10;
         }
         
         #ground {
             position: absolute;
             bottom: 0;
-            width: 200%;
+            width: 100%;
             height: 30px;
             background-color: #333;
-            background-image: repeating-linear-gradient(90deg, transparent, transparent 49px, #444 50px);
-            z-index: 5;
-        }
-        
-        #background {
-            position: absolute;
-            bottom: 30px;
-            width: 200%;
-            height: 70px;
-            background-color: #f0f0f0;
-            z-index: 1;
         }
         
         #status {
@@ -58,8 +45,6 @@
             background-color: rgba(255, 255, 255, 0.7);
             padding: 5px 10px;
             border-radius: 5px;
-            max-width: 80%;
-            z-index: 20;
         }
         
         #instructions {
@@ -71,8 +56,6 @@
             background-color: rgba(255, 255, 255, 0.9);
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            z-index: 20;
         }
         
         button {
@@ -83,43 +66,23 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            margin-top: 10px;
-        }
-        
-        .cactus {
-            position: absolute;
-            bottom: 100px;
-            width: 20px;
-            height: 40px;
-            background-color: #333;
-            z-index: 8;
-        }
-        
-        .cloud {
-            position: absolute;
-            background-color: #ccc;
-            border-radius: 50%;
-            z-index: 2;
         }
         
         #error-message {
             color: red;
             margin-top: 10px;
-            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="status">Статус: Нажмите "Разрешить микрофон"</div>
-        <div id="background"></div>
-        <div id="ground"></div>
+        <div id="status">Нажмите кнопку ниже</div>
         <div id="dino"></div>
+        <div id="ground"></div>
         <div id="instructions">
-            <h2>Голосовой динозавр Chrome</h2>
-            <p>Динозавр будет бежать, когда услышит ваш голос</p>
-            <p><small>(Как в оффлайн-игре Chrome, но управляется голосом)</small></p>
-            <button id="start-btn">Разрешить микрофон</button>
+            <h2>Голосовой динозавр</h2>
+            <p>Говорите - динозавр бежит, молчите - останавливается</p>
+            <button id="start-btn">Включить микрофон</button>
             <div id="error-message"></div>
         </div>
     </div>
@@ -129,257 +92,147 @@
         const statusDisplay = document.getElementById('status');
         const startBtn = document.getElementById('start-btn');
         const instructions = document.getElementById('instructions');
-        const gameContainer = document.getElementById('game-container');
         const errorMessage = document.getElementById('error-message');
-        const ground = document.getElementById('ground');
-        const background = document.getElementById('background');
         
         let audioContext;
         let analyser;
         let microphone;
         let isMoving = false;
-        let dinoPosition = 50;
         let animationId;
-        let frameCount = 0;
-        let groundPosition = 0;
-        let bgPosition = 0;
-        let cacti = [];
-        let clouds = [];
-        let gameSpeed = 0;
         
-        // Создаем несколько облаков в начале
-        function createInitialClouds() {
-            for (let i = 0; i < 5; i++) {
-                createCloud(true);
+        // Проверка поддержки Web Audio API
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            showError("Ваш браузер не поддерживает Web Audio API");
+            startBtn.disabled = true;
+        }
+        
+        // Проверка поддержки getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError("Ваш браузер не поддерживает доступ к микрофону");
+            startBtn.disabled = true;
+        } else {
+            // Проверка HTTPS/localhost
+            if (window.location.protocol !== 'https:' && 
+                window.location.hostname !== 'localhost' && 
+                window.location.hostname !== '127.0.0.1') {
+                showError("Для работы микрофона откройте страницу через HTTPS или локально");
             }
-        }
-        
-        function createCloud(initial = false) {
-            const cloud = document.createElement('div');
-            cloud.className = 'cloud';
-            
-            const size = 30 + Math.random() * 30;
-            const bottom = 150 + Math.random() * 50;
-            
-            cloud.style.width = size + 'px';
-            cloud.style.height = size / 2 + 'px';
-            cloud.style.bottom = bottom + 'px';
-            cloud.style.left = initial ? (Math.random() * window.innerWidth) + 'px' : (window.innerWidth + size) + 'px';
-            
-            gameContainer.appendChild(cloud);
-            clouds.push({
-                element: cloud,
-                speed: 0.5 + Math.random() * 0.5
-            });
-        }
-        
-        function showError(message) {
-            errorMessage.textContent = message;
-            statusDisplay.textContent = 'Статус: Ошибка доступа к микрофону';
         }
         
         startBtn.addEventListener('click', initAudio);
         
+        function showError(message) {
+            errorMessage.textContent = message;
+            statusDisplay.textContent = "Ошибка";
+            console.error(message);
+        }
+        
         function initAudio() {
             startBtn.disabled = true;
-            statusDisplay.textContent = 'Статус: Запрос разрешения микрофона...';
-            errorMessage.textContent = '';
+            statusDisplay.textContent = "Запрос доступа к микрофону...";
+            errorMessage.textContent = "";
             
-            if (microphone) {
-                microphone.disconnect();
-            }
-            if (audioContext) {
-                audioContext.close();
-            }
+            // Очистка предыдущих подключений
+            if (microphone) microphone.disconnect();
+            if (audioContext) audioContext.close();
             
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(handleAudioStream)
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    startBtn.textContent = "Микрофон включен";
+                    instructions.style.display = "none";
+                    statusDisplay.textContent = "Говорите - динозавр побежит";
+                    
+                    setupAudio(stream);
+                    startAnimation();
+                })
                 .catch(error => {
-                    console.error('Ошибка доступа к микрофону:', error);
-                    let errorText = 'Не удалось получить доступ к микрофону. ';
-                    
-                    if (error.name === 'NotAllowedError') {
-                        errorText += 'Вы отказали в доступе к микрофону.';
-                    } else if (error.name === 'NotFoundError') {
-                        errorText += 'Микрофон не найден.';
-                    } else if (error.name === 'NotReadableError') {
-                        errorText += 'Микрофон уже используется.';
-                    } else {
-                        errorText += 'Ошибка: ' + error.message;
-                    }
-                    
-                    showError(errorText);
-                    statusDisplay.textContent = 'Статус: Ошибка доступа к микрофону';
                     startBtn.disabled = false;
+                    handleMicrophoneError(error);
                 });
         }
         
-        function handleAudioStream(stream) {
-            const audioTracks = stream.getAudioTracks();
-            if (audioTracks.length === 0 || audioTracks[0].readyState === 'ended') {
-                showError('Микрофон отключен или недоступен.');
-                startBtn.disabled = false;
-                return;
-            }
+        function setupAudio(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
             
-            instructions.style.display = 'none';
-            statusDisplay.textContent = 'Статус: Микрофон активирован. Говорите, чтобы игра началась.';
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
             
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                
-                microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                
-                audioTracks[0].onended = () => {
-                    showError('Микрофон был отключен.');
-                    stopAnimation();
-                    instructions.style.display = 'block';
-                    startBtn.disabled = false;
-                };
-                
-                createInitialClouds();
-                startAnimation();
-            } catch (e) {
-                console.error('Ошибка инициализации аудио:', e);
-                showError('Ошибка инициализации аудио: ' + e.message);
-                startBtn.disabled = false;
-            }
+            // Обработка отключения микрофона
+            stream.getAudioTracks()[0].onended = () => {
+                showError("Микрофон был отключен");
+                resetGame();
+            };
         }
         
-        function stopAnimation() {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-            if (microphone) {
-                microphone.disconnect();
-            }
-            if (audioContext && audioContext.state !== 'closed') {
-                audioContext.close();
-            }
-        }
-        
-        function createCactus() {
-            if (Math.random() > 0.02 || gameSpeed === 0) return;
+        function handleMicrophoneError(error) {
+            let message = "Ошибка доступа к микрофону: ";
             
-            const cactus = document.createElement('div');
-            cactus.className = 'cactus';
-            cactus.style.left = window.innerWidth + 'px';
-            cactus.style.height = (30 + Math.random() * 30) + 'px';
-            gameContainer.appendChild(cactus);
-            
-            cacti.push({
-                element: cactus,
-                x: window.innerWidth
-            });
-        }
-        
-        function updateGameElements() {
-            // Обновляем позицию земли и фона
-            groundPosition -= gameSpeed;
-            bgPosition -= gameSpeed * 0.5;
-            
-            if (groundPosition <= -window.innerWidth) groundPosition = 0;
-            if (bgPosition <= -window.innerWidth) bgPosition = 0;
-            
-            ground.style.left = groundPosition + 'px';
-            background.style.left = bgPosition + 'px';
-            
-            // Обновляем кактусы
-            for (let i = cacti.length - 1; i >= 0; i--) {
-                const cactus = cacti[i];
-                cactus.x -= gameSpeed;
-                cactus.element.style.left = cactus.x + 'px';
-                
-                // Проверка столкновения
-                const dinoRect = dino.getBoundingClientRect();
-                const cactusRect = cactus.element.getBoundingClientRect();
-                
-                if (!(
-                    dinoRect.right < cactusRect.left || 
-                    dinoRect.left > cactusRect.right || 
-                    dinoRect.bottom < cactusRect.top || 
-                    dinoRect.top > cactusRect.bottom
-                )) {
-                    // Столкновение
-                    statusDisplay.textContent = 'Статус: Игра окончена! Столкновение с кактусом.';
-                    gameSpeed = 0;
-                    stopAnimation();
-                    instructions.style.display = 'block';
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Начать заново';
-                    return;
-                }
-                
-                if (cactus.x < -50) {
-                    cactus.element.remove();
-                    cacti.splice(i, 1);
-                }
+            switch(error.name) {
+                case 'NotAllowedError':
+                    message += "Вы отказали в доступе к микрофону";
+                    break;
+                case 'NotFoundError':
+                    message += "Микрофон не найден";
+                    break;
+                case 'NotReadableError':
+                    message += "Микрофон уже используется";
+                    break;
+                default:
+                    message += error.message;
             }
             
-            // Обновляем облака
-            for (let i = clouds.length - 1; i >= 0; i--) {
-                const cloud = clouds[i];
-                const cloudRect = cloud.element.getBoundingClientRect();
-                cloud.element.style.left = (parseFloat(cloud.element.style.left) - cloud.speed * gameSpeed + 'px';
-                
-                if (parseFloat(cloud.element.style.left) < -cloudRect.width) {
-                    cloud.element.remove();
-                    clouds.splice(i, 1);
-                    createCloud();
-                }
-            }
+            showError(message);
+            statusDisplay.textContent = "Ошибка микрофона";
         }
         
         function startAnimation() {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
+            let dinoPosition = 50;
             
-            function checkAudio() {
+            function animate() {
                 analyser.getByteFrequencyData(dataArray);
                 
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                    sum += dataArray[i];
-                }
-                const average = sum / bufferLength;
+                // Вычисляем средний уровень звука
+                let sum = dataArray.reduce((a, b) => a + b, 0);
+                let average = sum / bufferLength;
                 
-                if (average > 10) {
+                if (average > 10) { // Порог активации
                     if (!isMoving) {
                         isMoving = true;
-                        statusDisplay.textContent = 'Статус: Голос обнаружен! Динозавр бежит.';
+                        statusDisplay.textContent = "Динозавр бежит!";
                     }
-                    gameSpeed = 5;
-                    
-                    // Анимация бега динозавра
-                    frameCount++;
-                    if (frameCount % 10 < 5) {
-                        dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,50 L50,50 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
-                    } else {
-                        dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,60 L40,60 L40,80 L30,80 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
-                    }
+                    dinoPosition += 3;
+                    dino.style.left = dinoPosition + "px";
                 } else {
                     if (isMoving) {
                         isMoving = false;
-                        statusDisplay.textContent = 'Статус: Тишина. Игра остановлена.';
+                        statusDisplay.textContent = "Тишина - динозавр остановился";
                     }
-                    gameSpeed = 0;
-                    dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
                 }
                 
-                createCactus();
-                updateGameElements();
-                
-                animationId = requestAnimationFrame(checkAudio);
+                animationId = requestAnimationFrame(animate);
             }
             
-            checkAudio();
+            animate();
         }
         
-        window.addEventListener('beforeunload', stopAnimation);
+        function resetGame() {
+            if (animationId) cancelAnimationFrame(animationId);
+            if (microphone) microphone.disconnect();
+            if (audioContext) audioContext.close();
+            
+            dino.style.left = "50px";
+            instructions.style.display = "block";
+            startBtn.disabled = false;
+            startBtn.textContent = "Попробовать снова";
+            isMoving = false;
+        }
+        
+        // Очистка при закрытии страницы
+        window.addEventListener('beforeunload', resetGame);
     </script>
 </body>
 </html>
