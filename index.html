@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой динозавр с монетками</title>
+    <title>Голосовой динозавр с линиями</title>
     <style>
         body {
             margin: 0;
@@ -144,6 +144,15 @@
             border-radius: 5px;
             z-index: 20;
         }
+        
+        #road {
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 150px;
+            background-color: #654321;
+            z-index: 4;
+        }
     </style>
 </head>
 <body>
@@ -151,6 +160,7 @@
         <div id="status">Статус: Нажмите "Включить микрофон"</div>
         <div id="score-display">Монет: 0</div>
         <div id="terrain-info">Положение: средняя линия</div>
+        <div id="road"></div>
         <div class="guide-line" id="top-line"></div>
         <div class="guide-line" id="middle-line"></div>
         <div class="guide-line" id="bottom-line"></div>
@@ -163,7 +173,7 @@
                 <li>Средняя громкость (жёлтая зона) - средняя линия</li>
                 <li>Громкий голос (красная зона) - верхняя линия</li>
             </ul>
-            <p>Удерживайте громкость, чтобы оставаться на линии и собирать монетки!</p>
+            <p>Динозавр движется по линии только при удержании нужной громкости!</p>
             <div id="volume-display">
                 <div id="volume-level"></div>
             </div>
@@ -182,6 +192,7 @@
         const volumeLevel = document.getElementById('volume-level');
         const terrainInfo = document.getElementById('terrain-info');
         const gameContainer = document.getElementById('game-container');
+        const road = document.getElementById('road');
         
         let audioContext;
         let analyser;
@@ -191,9 +202,9 @@
         let currentLine = 'middle'; // top, middle, bottom
         let score = 0;
         let coins = [];
+        let roadPosition = 0;
+        let isMoving = false;
         let volumeHistory = [];
-        let requiredVolume = 0;
-        let volumeStableCount = 0;
         const STABLE_THRESHOLD = 20; // Количество кадров для стабильности
         
         // Проверка поддержки API
@@ -279,7 +290,7 @@
             coins.forEach(coin => coin.element.remove());
             coins = [];
             
-            // Генерируем 3-5 монеток
+            // Генерируем 3-5 монеток на случайных линиях
             const coinCount = Math.floor(Math.random() * 3) + 3;
             const lines = ['top', 'middle', 'bottom'];
             
@@ -327,6 +338,9 @@
                 // Определяем положение динозавра
                 determineDinoPosition();
                 
+                // Двигаем дорогу если нужно
+                moveRoad();
+                
                 // Проверяем сбор монеток
                 checkCoinCollection();
                 
@@ -364,31 +378,32 @@
             let targetLine = currentLine;
             if (avg < 30) {
                 targetLine = 'bottom';
-                requiredVolume = 15;
             } else if (avg < 70) {
                 targetLine = 'middle';
-                requiredVolume = 50;
             } else {
                 targetLine = 'top';
-                requiredVolume = 85;
             }
             
-            // Проверяем, удерживается ли нужная громкость
-            if (Math.abs(averageVolume - requiredVolume) < 15) {
-                volumeStableCount++;
-            } else {
-                volumeStableCount = 0;
-            }
-            
-            // Если громкость стабильна - меняем линию
-            if (targetLine !== currentLine && volumeStableCount > STABLE_THRESHOLD) {
+            // Если линия изменилась - перемещаем динозавра
+            if (targetLine !== currentLine) {
                 currentLine = targetLine;
-                volumeStableCount = 0;
                 updateDinoPosition();
             }
             
+            // Определяем, должен ли динозавр двигаться
+            isMoving = checkVolumeStability();
+            
             // Обновляем статус
             updateStatus();
+        }
+        
+        function checkVolumeStability() {
+            // Проверяем, находится ли громкость в нужном диапазоне
+            switch(currentLine) {
+                case 'top': return averageVolume > 70;
+                case 'middle': return averageVolume > 30 && averageVolume < 70;
+                case 'bottom': return averageVolume < 30;
+            }
         }
         
         function updateDinoPosition() {
@@ -412,6 +427,36 @@
             dino.style.bottom = bottomPosition;
         }
         
+        function moveRoad() {
+            if (isMoving) {
+                roadPosition -= 3;
+                if (roadPosition <= -window.innerWidth) {
+                    roadPosition = 0;
+                }
+                
+                road.style.left = roadPosition + 'px';
+                
+                // Двигаем монетки вместе с дорогой
+                coins.forEach(coin => {
+                    if (!coin.collected) {
+                        coin.x -= 3;
+                        coin.element.style.left = coin.x + 'px';
+                        
+                        // Если монетка ушла за экран - удаляем
+                        if (coin.x < -50) {
+                            coin.element.remove();
+                            coin.collected = true;
+                        }
+                    }
+                });
+                
+                // Если все монетки собраны или ушли - генерируем новые
+                if (coins.every(c => c.collected)) {
+                    generateCoins();
+                }
+            }
+        }
+        
         function updateStatus() {
             const lineNames = {
                 'top': 'верхней',
@@ -419,7 +464,13 @@
                 'bottom': 'нижней'
             };
             
-            statusDisplay.textContent = `Удерживайте громкость ${currentLine === 'top' ? 'выше 85' : currentLine === 'middle' ? 'около 50' : 'ниже 30'} для ${lineNames[currentLine]} линии`;
+            if (isMoving) {
+                statusDisplay.textContent = `Движение по ${lineNames[currentLine]} линии!`;
+            } else {
+                statusDisplay.textContent = currentLine === 'top' ? "Говорите громче для движения!" : 
+                                          currentLine === 'middle' ? "Держите среднюю громкость для движения!" : 
+                                          "Говорите тише для движения!";
+            }
         }
         
         function checkCoinCollection() {
@@ -444,11 +495,6 @@
                         // Анимация сбора
                         statusDisplay.textContent = "Монетка собрана!";
                         setTimeout(() => updateStatus(), 1000);
-                        
-                        // Генерируем новые монетки, если все собраны
-                        if (coins.every(c => c.collected)) {
-                            generateCoins();
-                        }
                     }
                 }
             });
@@ -469,8 +515,10 @@
             scoreDisplay.textContent = "Монет: 0";
             coins.forEach(coin => coin.element.remove());
             coins = [];
+            roadPosition = 0;
+            road.style.left = "0px";
+            isMoving = false;
             volumeHistory = [];
-            volumeStableCount = 0;
         }
         
         window.addEventListener('beforeunload', resetGame);
