@@ -16,6 +16,7 @@
             position: relative;
             width: 100vw;
             height: 100vh;
+            overflow: hidden;
         }
         
         #dino {
@@ -26,15 +27,26 @@
             height: 86px;
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
             background-repeat: no-repeat;
-            transition: left 0.1s linear;
+            z-index: 10;
         }
         
         #ground {
             position: absolute;
             bottom: 0;
-            width: 100%;
+            width: 200%;
             height: 30px;
             background-color: #333;
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 49px, #444 50px);
+            z-index: 5;
+        }
+        
+        #background {
+            position: absolute;
+            bottom: 30px;
+            width: 200%;
+            height: 70px;
+            background-color: #f0f0f0;
+            z-index: 1;
         }
         
         #status {
@@ -47,6 +59,7 @@
             padding: 5px 10px;
             border-radius: 5px;
             max-width: 80%;
+            z-index: 20;
         }
         
         #instructions {
@@ -59,6 +72,7 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 20;
         }
         
         button {
@@ -78,6 +92,14 @@
             width: 20px;
             height: 40px;
             background-color: #333;
+            z-index: 8;
+        }
+        
+        .cloud {
+            position: absolute;
+            background-color: #ccc;
+            border-radius: 50%;
+            z-index: 2;
         }
         
         #error-message {
@@ -90,12 +112,13 @@
 <body>
     <div id="game-container">
         <div id="status">Статус: Нажмите "Разрешить микрофон"</div>
-        <div id="dino"></div>
+        <div id="background"></div>
         <div id="ground"></div>
+        <div id="dino"></div>
         <div id="instructions">
             <h2>Голосовой динозавр Chrome</h2>
             <p>Динозавр будет бежать, когда услышит ваш голос</p>
-            <p><small>(Как в оффлайн-игре Chrome)</small></p>
+            <p><small>(Как в оффлайн-игре Chrome, но управляется голосом)</small></p>
             <button id="start-btn">Разрешить микрофон</button>
             <div id="error-message"></div>
         </div>
@@ -108,6 +131,8 @@
         const instructions = document.getElementById('instructions');
         const gameContainer = document.getElementById('game-container');
         const errorMessage = document.getElementById('error-message');
+        const ground = document.getElementById('ground');
+        const background = document.getElementById('background');
         
         let audioContext;
         let analyser;
@@ -116,17 +141,36 @@
         let dinoPosition = 50;
         let animationId;
         let frameCount = 0;
+        let groundPosition = 0;
+        let bgPosition = 0;
+        let cacti = [];
+        let clouds = [];
+        let gameSpeed = 0;
         
-        // Проверяем поддержку getUserMedia
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showError('Ваш браузер не поддерживает доступ к микрофону. Пожалуйста, используйте современный браузер (Chrome, Firefox, Edge).');
-            startBtn.disabled = true;
-        } else {
-            // Проверяем, работает ли сайт по HTTPS или localhost
-            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                showError('Для доступа к микрофону страница должна быть открыта по HTTPS или с localhost. ' +
-                         'Попробуйте открыть этот файл непосредственно с вашего компьютера (file://) или разместите на HTTPS-сервере.');
+        // Создаем несколько облаков в начале
+        function createInitialClouds() {
+            for (let i = 0; i < 5; i++) {
+                createCloud(true);
             }
+        }
+        
+        function createCloud(initial = false) {
+            const cloud = document.createElement('div');
+            cloud.className = 'cloud';
+            
+            const size = 30 + Math.random() * 30;
+            const bottom = 150 + Math.random() * 50;
+            
+            cloud.style.width = size + 'px';
+            cloud.style.height = size / 2 + 'px';
+            cloud.style.bottom = bottom + 'px';
+            cloud.style.left = initial ? (Math.random() * window.innerWidth) + 'px' : (window.innerWidth + size) + 'px';
+            
+            gameContainer.appendChild(cloud);
+            clouds.push({
+                element: cloud,
+                speed: 0.5 + Math.random() * 0.5
+            });
         }
         
         function showError(message) {
@@ -141,7 +185,6 @@
             statusDisplay.textContent = 'Статус: Запрос разрешения микрофона...';
             errorMessage.textContent = '';
             
-            // Сбросим предыдущие подключения, если они были
             if (microphone) {
                 microphone.disconnect();
             }
@@ -156,13 +199,13 @@
                     let errorText = 'Не удалось получить доступ к микрофону. ';
                     
                     if (error.name === 'NotAllowedError') {
-                        errorText += 'Вы отказали в доступе к микрофону. Пожалуйста, разрешите доступ и попробуйте снова.';
+                        errorText += 'Вы отказали в доступе к микрофону.';
                     } else if (error.name === 'NotFoundError') {
-                        errorText += 'Микрофон не найден. Убедитесь, что микрофон подключен.';
+                        errorText += 'Микрофон не найден.';
                     } else if (error.name === 'NotReadableError') {
-                        errorText += 'Микрофон уже используется другим приложением.';
+                        errorText += 'Микрофон уже используется.';
                     } else {
-                        errorText += 'Техническая ошибка: ' + error.message;
+                        errorText += 'Ошибка: ' + error.message;
                     }
                     
                     showError(errorText);
@@ -172,16 +215,15 @@
         }
         
         function handleAudioStream(stream) {
-            // Проверяем, не отключен ли микрофон в системе
             const audioTracks = stream.getAudioTracks();
             if (audioTracks.length === 0 || audioTracks[0].readyState === 'ended') {
-                showError('Микрофон отключен или недоступен. Проверьте настройки системы.');
+                showError('Микрофон отключен или недоступен.');
                 startBtn.disabled = false;
                 return;
             }
             
             instructions.style.display = 'none';
-            statusDisplay.textContent = 'Статус: Микрофон активирован. Говорите, чтобы динозавр бежал.';
+            statusDisplay.textContent = 'Статус: Микрофон активирован. Говорите, чтобы игра началась.';
             
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -191,14 +233,14 @@
                 microphone = audioContext.createMediaStreamSource(stream);
                 microphone.connect(analyser);
                 
-                // Обработка остановки микрофона
                 audioTracks[0].onended = () => {
-                    showError('Микрофон был отключен. Нажмите кнопку снова для повторного подключения.');
+                    showError('Микрофон был отключен.');
                     stopAnimation();
                     instructions.style.display = 'block';
                     startBtn.disabled = false;
                 };
                 
+                createInitialClouds();
                 startAnimation();
             } catch (e) {
                 console.error('Ошибка инициализации аудио:', e);
@@ -221,27 +263,40 @@
         }
         
         function createCactus() {
-            if (Math.random() > 0.02) return;
+            if (Math.random() > 0.02 || gameSpeed === 0) return;
             
             const cactus = document.createElement('div');
             cactus.className = 'cactus';
-            cactus.style.left = '100vw';
+            cactus.style.left = window.innerWidth + 'px';
             cactus.style.height = (30 + Math.random() * 30) + 'px';
             gameContainer.appendChild(cactus);
             
-            let cactusPos = window.innerWidth;
-            function moveCactus() {
-                cactusPos -= 5;
-                cactus.style.left = cactusPos + 'px';
-                
-                if (cactusPos < -50) {
-                    cactus.remove();
-                    return;
-                }
+            cacti.push({
+                element: cactus,
+                x: window.innerWidth
+            });
+        }
+        
+        function updateGameElements() {
+            // Обновляем позицию земли и фона
+            groundPosition -= gameSpeed;
+            bgPosition -= gameSpeed * 0.5;
+            
+            if (groundPosition <= -window.innerWidth) groundPosition = 0;
+            if (bgPosition <= -window.innerWidth) bgPosition = 0;
+            
+            ground.style.left = groundPosition + 'px';
+            background.style.left = bgPosition + 'px';
+            
+            // Обновляем кактусы
+            for (let i = cacti.length - 1; i >= 0; i--) {
+                const cactus = cacti[i];
+                cactus.x -= gameSpeed;
+                cactus.element.style.left = cactus.x + 'px';
                 
                 // Проверка столкновения
                 const dinoRect = dino.getBoundingClientRect();
-                const cactusRect = cactus.getBoundingClientRect();
+                const cactusRect = cactus.element.getBoundingClientRect();
                 
                 if (!(
                     dinoRect.right < cactusRect.left || 
@@ -251,6 +306,7 @@
                 )) {
                     // Столкновение
                     statusDisplay.textContent = 'Статус: Игра окончена! Столкновение с кактусом.';
+                    gameSpeed = 0;
                     stopAnimation();
                     instructions.style.display = 'block';
                     startBtn.disabled = false;
@@ -258,12 +314,24 @@
                     return;
                 }
                 
-                if (animationId) {
-                    requestAnimationFrame(moveCactus);
+                if (cactus.x < -50) {
+                    cactus.element.remove();
+                    cacti.splice(i, 1);
                 }
             }
             
-            requestAnimationFrame(moveCactus);
+            // Обновляем облака
+            for (let i = clouds.length - 1; i >= 0; i--) {
+                const cloud = clouds[i];
+                const cloudRect = cloud.element.getBoundingClientRect();
+                cloud.element.style.left = (parseFloat(cloud.element.style.left) - cloud.speed * gameSpeed + 'px';
+                
+                if (parseFloat(cloud.element.style.left) < -cloudRect.width) {
+                    cloud.element.remove();
+                    clouds.splice(i, 1);
+                    createCloud();
+                }
+            }
         }
         
         function startAnimation() {
@@ -284,9 +352,9 @@
                         isMoving = true;
                         statusDisplay.textContent = 'Статус: Голос обнаружен! Динозавр бежит.';
                     }
-                    dinoPosition += 3;
-                    dino.style.left = dinoPosition + 'px';
+                    gameSpeed = 5;
                     
+                    // Анимация бега динозавра
                     frameCount++;
                     if (frameCount % 10 < 5) {
                         dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,50 L50,50 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
@@ -296,12 +364,14 @@
                 } else {
                     if (isMoving) {
                         isMoving = false;
-                        statusDisplay.textContent = 'Статус: Тишина. Динозавр остановился.';
-                        dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
+                        statusDisplay.textContent = 'Статус: Тишина. Игра остановлена.';
                     }
+                    gameSpeed = 0;
+                    dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
                 }
                 
                 createCactus();
+                updateGameElements();
                 
                 animationId = requestAnimationFrame(checkAudio);
             }
