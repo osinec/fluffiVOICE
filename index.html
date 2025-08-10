@@ -46,6 +46,7 @@
             background-color: rgba(255, 255, 255, 0.7);
             padding: 5px 10px;
             border-radius: 5px;
+            max-width: 80%;
         }
         
         #instructions {
@@ -78,6 +79,12 @@
             height: 40px;
             background-color: #333;
         }
+        
+        #error-message {
+            color: red;
+            margin-top: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -90,6 +97,7 @@
             <p>Динозавр будет бежать, когда услышит ваш голос</p>
             <p><small>(Как в оффлайн-игре Chrome)</small></p>
             <button id="start-btn">Разрешить микрофон</button>
+            <div id="error-message"></div>
         </div>
     </div>
 
@@ -99,6 +107,7 @@
         const startBtn = document.getElementById('start-btn');
         const instructions = document.getElementById('instructions');
         const gameContainer = document.getElementById('game-container');
+        const errorMessage = document.getElementById('error-message');
         
         let audioContext;
         let analyser;
@@ -110,8 +119,19 @@
         
         // Проверяем поддержку getUserMedia
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            statusDisplay.textContent = 'Статус: Ваш браузер не поддерживает доступ к микрофону';
+            showError('Ваш браузер не поддерживает доступ к микрофону. Пожалуйста, используйте современный браузер (Chrome, Firefox, Edge).');
             startBtn.disabled = true;
+        } else {
+            // Проверяем, работает ли сайт по HTTPS или localhost
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                showError('Для доступа к микрофону страница должна быть открыта по HTTPS или с localhost. ' +
+                         'Попробуйте открыть этот файл непосредственно с вашего компьютера (file://) или разместите на HTTPS-сервере.');
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            statusDisplay.textContent = 'Статус: Ошибка доступа к микрофону';
         }
         
         startBtn.addEventListener('click', initAudio);
@@ -119,27 +139,85 @@
         function initAudio() {
             startBtn.disabled = true;
             statusDisplay.textContent = 'Статус: Запрос разрешения микрофона...';
+            errorMessage.textContent = '';
+            
+            // Сбросим предыдущие подключения, если они были
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
             
             navigator.mediaDevices.getUserMedia({ audio: true, video: false })
                 .then(handleAudioStream)
                 .catch(error => {
-                    statusDisplay.textContent = 'Статус: Ошибка доступа к микрофону: ' + error.message;
+                    console.error('Ошибка доступа к микрофону:', error);
+                    let errorText = 'Не удалось получить доступ к микрофону. ';
+                    
+                    if (error.name === 'NotAllowedError') {
+                        errorText += 'Вы отказали в доступе к микрофону. Пожалуйста, разрешите доступ и попробуйте снова.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorText += 'Микрофон не найден. Убедитесь, что микрофон подключен.';
+                    } else if (error.name === 'NotReadableError') {
+                        errorText += 'Микрофон уже используется другим приложением.';
+                    } else {
+                        errorText += 'Техническая ошибка: ' + error.message;
+                    }
+                    
+                    showError(errorText);
+                    statusDisplay.textContent = 'Статус: Ошибка доступа к микрофону';
                     startBtn.disabled = false;
                 });
         }
         
         function handleAudioStream(stream) {
+            // Проверяем, не отключен ли микрофон в системе
+            const audioTracks = stream.getAudioTracks();
+            if (audioTracks.length === 0 || audioTracks[0].readyState === 'ended') {
+                showError('Микрофон отключен или недоступен. Проверьте настройки системы.');
+                startBtn.disabled = false;
+                return;
+            }
+            
             instructions.style.display = 'none';
             statusDisplay.textContent = 'Статус: Микрофон активирован. Говорите, чтобы динозавр бежал.';
             
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            
-            microphone = audioContext.createMediaStreamSource(stream);
-            microphone.connect(analyser);
-            
-            startAnimation();
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                // Обработка остановки микрофона
+                audioTracks[0].onended = () => {
+                    showError('Микрофон был отключен. Нажмите кнопку снова для повторного подключения.');
+                    stopAnimation();
+                    instructions.style.display = 'block';
+                    startBtn.disabled = false;
+                };
+                
+                startAnimation();
+            } catch (e) {
+                console.error('Ошибка инициализации аудио:', e);
+                showError('Ошибка инициализации аудио: ' + e.message);
+                startBtn.disabled = false;
+            }
+        }
+        
+        function stopAnimation() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+            }
         }
         
         function createCactus() {
@@ -151,7 +229,6 @@
             cactus.style.height = (30 + Math.random() * 30) + 'px';
             gameContainer.appendChild(cactus);
             
-            // Анимация кактуса
             let cactusPos = window.innerWidth;
             function moveCactus() {
                 cactusPos -= 5;
@@ -174,11 +251,16 @@
                 )) {
                     // Столкновение
                     statusDisplay.textContent = 'Статус: Игра окончена! Столкновение с кактусом.';
-                    cancelAnimationFrame(animationId);
+                    stopAnimation();
+                    instructions.style.display = 'block';
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Начать заново';
                     return;
                 }
                 
-                requestAnimationFrame(moveCactus);
+                if (animationId) {
+                    requestAnimationFrame(moveCactus);
+                }
             }
             
             requestAnimationFrame(moveCactus);
@@ -191,14 +273,12 @@
             function checkAudio() {
                 analyser.getByteFrequencyData(dataArray);
                 
-                // Проверяем уровень звука
                 let sum = 0;
                 for (let i = 0; i < bufferLength; i++) {
                     sum += dataArray[i];
                 }
                 const average = sum / bufferLength;
                 
-                // Пороговое значение для обнаружения голоса
                 if (average > 10) {
                     if (!isMoving) {
                         isMoving = true;
@@ -207,7 +287,6 @@
                     dinoPosition += 3;
                     dino.style.left = dinoPosition + 'px';
                     
-                    // Анимация бега (2 кадра)
                     frameCount++;
                     if (frameCount % 10 < 5) {
                         dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,50 L50,50 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
@@ -218,12 +297,10 @@
                     if (isMoving) {
                         isMoving = false;
                         statusDisplay.textContent = 'Статус: Тишина. Динозавр остановился.';
-                        // Возвращаем стандартную позу
                         dino.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>\')';
                     }
                 }
                 
-                // Создаем кактусы
                 createCactus();
                 
                 animationId = requestAnimationFrame(checkAudio);
@@ -232,18 +309,7 @@
             checkAudio();
         }
         
-        // Остановка анимации при закрытии страницы
-        window.addEventListener('beforeunload', () => {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            if (microphone) {
-                microphone.disconnect();
-            }
-            if (audioContext) {
-                audioContext.close();
-            }
-        });
+        window.addEventListener('beforeunload', stopAnimation);
     </script>
 </body>
 </html>
