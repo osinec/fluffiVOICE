@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой динозавр с рельефом</title>
+    <title>Голосовой динозавр с линиями</title>
     <style>
         body {
             margin: 0;
@@ -28,14 +28,14 @@
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
             background-repeat: no-repeat;
             z-index: 10;
-            transition: bottom 0.5s ease;
+            transition: bottom 0.3s ease;
         }
         
         .guide-line {
             position: absolute;
             left: 0;
             width: 100%;
-            height: 1px;
+            height: 2px;
             background-color: black;
             z-index: 5;
         }
@@ -128,18 +128,18 @@
 <body>
     <div id="game-container">
         <div id="status">Статус: Нажмите "Включить микрофон"</div>
-        <div id="terrain-info">Рельеф: ровный</div>
+        <div id="terrain-info">Положение: средняя линия</div>
         <div class="guide-line" id="top-line"></div>
         <div class="guide-line" id="middle-line"></div>
         <div class="guide-line" id="bottom-line"></div>
         <div id="dino"></div>
         <div id="instructions">
             <h2>Голосовой динозавр</h2>
-            <p>Управляйте высотой динозавра голосом:</p>
+            <p>Управляйте положением динозавра голосом:</p>
             <ul style="text-align: left; margin: 10px auto; width: fit-content;">
                 <li>Средняя громкость - средняя линия</li>
-                <li>Громче - подъем к верхней линии</li>
-                <li>Тише - спуск к нижней линии</li>
+                <li>Громче - верхняя линия</li>
+                <li>Тише - нижняя линия</li>
             </ul>
             <div id="volume-display">
                 <div id="volume-level"></div>
@@ -161,14 +161,9 @@
         let audioContext;
         let analyser;
         let microphone;
-        let isMoving = false;
         let animationId;
         let averageVolume = 0;
-        let currentPosition = 50; // 0-100 (низ-верх)
-        let targetPosition = 50;
-        let currentTerrain = 'flat'; // flat, uphill, downhill
-        let terrainChangeTimer = 0;
-        let nextTerrainChange = Math.random() * 3000 + 2000; // 2-5 секунд
+        let currentLine = 'middle'; // top, middle, bottom
         
         // Проверка поддержки API
         if (!window.AudioContext && !window.webkitAudioContext) {
@@ -201,7 +196,7 @@
                 .then(stream => {
                     startBtn.textContent = "Микрофон включен";
                     instructions.style.display = "none";
-                    statusDisplay.textContent = "Говорите - динозавр побежит";
+                    statusDisplay.textContent = "Говорите - динозавр будет двигаться";
                     
                     setupAudio(stream);
                     startAnimation();
@@ -261,11 +256,8 @@
                 // Обновляем индикатор громкости
                 updateVolumeDisplay(averageVolume);
                 
-                // Определяем текущий рельеф
-                determineTerrain();
-                
-                // Управление динозавром
-                controlDino();
+                // Определяем положение динозавра
+                determineDinoPosition();
                 
                 animationId = requestAnimationFrame(animate);
             }
@@ -287,62 +279,45 @@
             }
         }
         
-        function determineTerrain() {
-            // Меняем рельеф через случайные интервалы
-            terrainChangeTimer++;
-            if (terrainChangeTimer > nextTerrainChange / 16) { // Примерно 60fps
-                terrainChangeTimer = 0;
-                nextTerrainChange = Math.random() * 3000 + 2000; // 2-5 секунд
-                
-                const terrains = ['flat', 'uphill', 'downhill'];
-                currentTerrain = terrains[Math.floor(Math.random() * terrains.length)];
-                
-                switch(currentTerrain) {
-                    case 'flat':
-                        terrainInfo.textContent = "Рельеф: ровный (держите среднюю громкость)";
-                        break;
-                    case 'uphill':
-                        terrainInfo.textContent = "Рельеф: подъем (говорите громче!)";
-                        break;
-                    case 'downhill':
-                        terrainInfo.textContent = "Рельеф: спуск (говорите тише!)";
-                        break;
-                }
+        function determineDinoPosition() {
+            let newLine = currentLine;
+            
+            // Определяем новое положение на основе громкости
+            if (averageVolume > 60) {
+                newLine = 'top';
+            } else if (averageVolume > 30) {
+                newLine = 'middle';
+            } else if (averageVolume > 10) {
+                newLine = 'bottom';
+            }
+            
+            // Если положение изменилось - обновляем
+            if (newLine !== currentLine) {
+                currentLine = newLine;
+                updateDinoPosition();
             }
         }
         
-        function controlDino() {
-            // Определяем целевую позицию в зависимости от рельефа
-            switch(currentTerrain) {
-                case 'flat':
-                    targetPosition = 50; // Средняя линия
-                    isMoving = (averageVolume > 30 && averageVolume < 70);
+        function updateDinoPosition() {
+            let bottomPosition;
+            
+            switch(currentLine) {
+                case 'top':
+                    bottomPosition = '75vh'; // 100vh - 25vh (позиция линии) - высота динозавра
+                    terrainInfo.textContent = "Положение: верхняя линия";
                     break;
-                    
-                case 'uphill':
-                    targetPosition = 25; // Верхняя линия
-                    isMoving = (averageVolume > 60);
+                case 'middle':
+                    bottomPosition = '50vh';
+                    terrainInfo.textContent = "Положение: средняя линия";
                     break;
-                    
-                case 'downhill':
-                    targetPosition = 75; // Нижняя линия
-                    isMoving = (averageVolume > 10 && averageVolume < 40);
+                case 'bottom':
+                    bottomPosition = '25vh';
+                    terrainInfo.textContent = "Положение: нижняя линия";
                     break;
             }
             
-            // Плавное перемещение динозавра
-            currentPosition += (targetPosition - currentPosition) * 0.1;
-            const bottomPos = (100 - currentPosition) * window.innerHeight / 100;
-            dino.style.bottom = `${bottomPos}px`;
-            
-            // Обновляем статус
-            if (isMoving) {
-                statusDisplay.textContent = "Динозавр бежит правильно!";
-            } else {
-                statusDisplay.textContent = currentTerrain === 'uphill' ? "Говорите громче!" : 
-                                          currentTerrain === 'downhill' ? "Говорите тише!" : 
-                                          "Держите среднюю громкость";
-            }
+            dino.style.bottom = bottomPosition;
+            statusDisplay.textContent = `Динозавр на ${currentLine === 'top' ? 'верхней' : currentLine === 'middle' ? 'средней' : 'нижней'} линии`;
         }
         
         function resetGame() {
@@ -354,13 +329,8 @@
             instructions.style.display = "block";
             startBtn.disabled = false;
             startBtn.textContent = "Попробовать снова";
-            isMoving = false;
-            currentTerrain = 'flat';
-            terrainInfo.textContent = "Рельеф: ровный";
-            currentPosition = 50;
-            targetPosition = 50;
-            terrainChangeTimer = 0;
-            nextTerrainChange = Math.random() * 3000 + 2000;
+            currentLine = 'middle';
+            terrainInfo.textContent = "Положение: средняя линия";
         }
         
         window.addEventListener('beforeunload', resetGame);
