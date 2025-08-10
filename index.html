@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой динозавр</title>
+    <title>Голосовой динозавр с монетками</title>
     <style>
         body {
             margin: 0;
@@ -22,7 +22,7 @@
         #dino {
             position: absolute;
             left: 50px;
-            bottom: 50vh;
+            bottom: 150px;
             width: 80px;
             height: 86px;
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
@@ -41,7 +41,7 @@
         }
         
         #top-line {
-            top: 25vh;
+            top: 25vh; /* Исправлено: теперь это нижняя линия */
         }
         
         #middle-line {
@@ -49,13 +49,34 @@
         }
         
         #bottom-line {
-            top: 75vh;
+            top: 75vh; /* Исправлено: теперь это верхняя линия */
+        }
+        
+        .coin {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="gold" stroke="%23D4AF37" stroke-width="2"/></svg>');
+            background-repeat: no-repeat;
+            z-index: 8;
         }
         
         #status {
             position: absolute;
             top: 20px;
             left: 20px;
+            font-size: 18px;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 20;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
             font-size: 18px;
             color: #333;
             background-color: rgba(255, 255, 255, 0.7);
@@ -116,6 +137,7 @@
 <body>
     <div id="game-container">
         <div id="status">Статус: Нажмите "Включить микрофон"</div>
+        <div id="score-display">Монет: 0</div>
         <div class="guide-line" id="top-line"></div>
         <div class="guide-line" id="middle-line"></div>
         <div class="guide-line" id="bottom-line"></div>
@@ -124,9 +146,9 @@
             <h2>Голосовой динозавр</h2>
             <p>Управляйте высотой динозавра голосом:</p>
             <ul style="text-align: left; margin: 10px auto; width: fit-content;">
-                <li>Шёпот (зелёная зона) - нижняя линия</li>
+                <li>Шёпот (зелёная зона) - верхняя линия</li>
                 <li>Обычный голос (жёлтая зона) - средняя линия</li>
-                <li>Громкий голос (красная зона) - верхняя линия</li>
+                <li>Громкий голос (красная зона) - нижняя линия</li>
             </ul>
             <div id="volume-display">
                 <div id="volume-level"></div>
@@ -139,10 +161,12 @@
     <script>
         const dino = document.getElementById('dino');
         const statusDisplay = document.getElementById('status');
+        const scoreDisplay = document.getElementById('score-display');
         const startBtn = document.getElementById('start-btn');
         const instructions = document.getElementById('instructions');
         const errorMessage = document.getElementById('error-message');
         const volumeLevel = document.getElementById('volume-level');
+        const gameContainer = document.getElementById('game-container');
         
         let audioContext;
         let analyser;
@@ -150,6 +174,8 @@
         let animationId;
         let averageVolume = 0;
         let currentLine = 'middle'; // top, middle, bottom
+        let score = 0;
+        let coins = [];
         
         // Проверка поддержки API
         if (!window.AudioContext && !window.webkitAudioContext) {
@@ -185,6 +211,7 @@
                     statusDisplay.textContent = "Говорите - динозавр будет двигаться";
                     
                     setupAudio(stream);
+                    generateCoins();
                     startAnimation();
                 })
                 .catch(error => {
@@ -228,6 +255,42 @@
             statusDisplay.textContent = "Ошибка микрофона";
         }
         
+        function generateCoins() {
+            // Удаляем старые монетки
+            coins.forEach(coin => coin.element.remove());
+            coins = [];
+            
+            // Генерируем 3-5 монеток на случайных линиях
+            const coinCount = Math.floor(Math.random() * 3) + 3;
+            const lines = ['top', 'middle', 'bottom'];
+            
+            for (let i = 0; i < coinCount; i++) {
+                const line = lines[Math.floor(Math.random() * lines.length)];
+                const x = Math.random() * window.innerWidth * 0.7 + window.innerWidth * 0.3;
+                
+                const coin = document.createElement('div');
+                coin.className = 'coin';
+                
+                let yPos;
+                switch(line) {
+                    case 'top': yPos = '75vh'; break;    // Нижняя линия
+                    case 'middle': yPos = '50vh'; break;
+                    case 'bottom': yPos = '25vh'; break; // Верхняя линия
+                }
+                
+                coin.style.left = `${x}px`;
+                coin.style.bottom = yPos;
+                gameContainer.appendChild(coin);
+                
+                coins.push({
+                    element: coin,
+                    x: x,
+                    line: line,
+                    collected: false
+                });
+            }
+        }
+        
         function startAnimation() {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
@@ -244,6 +307,9 @@
                 
                 // Определяем положение динозавра
                 determineDinoPosition();
+                
+                // Проверяем сбор монеток
+                checkCoinCollection();
                 
                 animationId = requestAnimationFrame(animate);
             }
@@ -270,11 +336,11 @@
             
             // Определяем новое положение на основе громкости
             if (averageVolume < 20) { // Шёпот
-                newLine = 'bottom';
+                newLine = 'bottom'; // Верхняя линия
             } else if (averageVolume < 60) { // Обычный голос
                 newLine = 'middle';
             } else { // Громкий голос
-                newLine = 'top';
+                newLine = 'top'; // Нижняя линия
             }
             
             // Если положение изменилось - обновляем
@@ -289,22 +355,54 @@
             let statusText;
             
             switch(currentLine) {
-                case 'top':
-                    bottomPosition = '25vh';
-                    statusText = "Громко - верхняя линия";
+                case 'top': // Нижняя линия (громко)
+                    bottomPosition = '75vh';
+                    statusText = "Громко - нижняя линия";
                     break;
                 case 'middle':
                     bottomPosition = '50vh';
                     statusText = "Нормально - средняя линия";
                     break;
-                case 'bottom':
-                    bottomPosition = '75vh';
-                    statusText = "Шёпот - нижняя линия";
+                case 'bottom': // Верхняя линия (шёпот)
+                    bottomPosition = '25vh';
+                    statusText = "Шёпот - верхняя линия";
                     break;
             }
             
             dino.style.bottom = bottomPosition;
             statusDisplay.textContent = statusText;
+        }
+        
+        function checkCoinCollection() {
+            const dinoRect = dino.getBoundingClientRect();
+            
+            coins.forEach(coin => {
+                if (!coin.collected && coin.line === currentLine) {
+                    const coinRect = coin.element.getBoundingClientRect();
+                    
+                    // Проверяем столкновение
+                    if (!(dinoRect.right < coinRect.left || 
+                          dinoRect.left > coinRect.right || 
+                          dinoRect.bottom < coinRect.top || 
+                          dinoRect.top > coinRect.bottom)) {
+                        
+                        // Собираем монетку
+                        coin.collected = true;
+                        coin.element.remove();
+                        score++;
+                        scoreDisplay.textContent = `Монет: ${score}`;
+                        
+                        // Анимация сбора
+                        statusDisplay.textContent = "Монетка собрана!";
+                        setTimeout(() => updateDinoPosition(), 1000);
+                        
+                        // Если все монетки собраны - генерируем новые
+                        if (coins.every(c => c.collected)) {
+                            generateCoins();
+                        }
+                    }
+                }
+            });
         }
         
         function resetGame() {
@@ -318,6 +416,10 @@
             startBtn.textContent = "Попробовать снова";
             currentLine = 'middle';
             statusDisplay.textContent = "Нажмите 'Включить микрофон'";
+            score = 0;
+            scoreDisplay.textContent = "Монет: 0";
+            coins.forEach(coin => coin.element.remove());
+            coins = [];
         }
         
         window.addEventListener('beforeunload', resetGame);
