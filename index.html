@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой динозавр с монетками</title>
+    <title>Голосовой динозавр с движением</title>
     <style>
         body {
             margin: 0;
@@ -41,7 +41,7 @@
         }
         
         #top-line {
-            top: 25vh; /* Исправлено: теперь это нижняя линия */
+            top: 25vh;
         }
         
         #middle-line {
@@ -49,7 +49,7 @@
         }
         
         #bottom-line {
-            top: 75vh; /* Исправлено: теперь это верхняя линия */
+            top: 75vh;
         }
         
         .coin {
@@ -132,6 +132,15 @@
             margin-top: 10px;
             font-size: 14px;
         }
+        
+        #road {
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 150px;
+            background-color: #654321;
+            z-index: 4;
+        }
     </style>
 </head>
 <body>
@@ -141,15 +150,17 @@
         <div class="guide-line" id="top-line"></div>
         <div class="guide-line" id="middle-line"></div>
         <div class="guide-line" id="bottom-line"></div>
+        <div id="road"></div>
         <div id="dino"></div>
         <div id="instructions">
             <h2>Голосовой динозавр</h2>
-            <p>Управляйте высотой динозавра голосом:</p>
+            <p>Управляйте динозавром голосом:</p>
             <ul style="text-align: left; margin: 10px auto; width: fit-content;">
                 <li>Шёпот (зелёная зона) - верхняя линия</li>
                 <li>Обычный голос (жёлтая зона) - средняя линия</li>
                 <li>Громкий голос (красная зона) - нижняя линия</li>
             </ul>
+            <p><strong>Динозавр движется вправо, когда вы говорите!</strong></p>
             <div id="volume-display">
                 <div id="volume-level"></div>
             </div>
@@ -167,6 +178,7 @@
         const errorMessage = document.getElementById('error-message');
         const volumeLevel = document.getElementById('volume-level');
         const gameContainer = document.getElementById('game-container');
+        const road = document.getElementById('road');
         
         let audioContext;
         let analyser;
@@ -176,6 +188,9 @@
         let currentLine = 'middle'; // top, middle, bottom
         let score = 0;
         let coins = [];
+        let roadPosition = 0;
+        let dinoPosition = 50;
+        let isMoving = false;
         
         // Проверка поддержки API
         if (!window.AudioContext && !window.webkitAudioContext) {
@@ -273,9 +288,9 @@
                 
                 let yPos;
                 switch(line) {
-                    case 'top': yPos = '75vh'; break;    // Нижняя линия
+                    case 'top': yPos = '25vh'; break;
                     case 'middle': yPos = '50vh'; break;
-                    case 'bottom': yPos = '25vh'; break; // Верхняя линия
+                    case 'bottom': yPos = '75vh'; break;
                 }
                 
                 coin.style.left = `${x}px`;
@@ -305,8 +320,11 @@
                 // Обновляем индикатор громкости
                 updateVolumeDisplay(averageVolume);
                 
-                // Определяем положение динозавра
-                determineDinoPosition();
+                // Определяем положение динозавра по высоте
+                determineDinoHeight();
+                
+                // Двигаем динозавра и дорогу
+                moveDino();
                 
                 // Проверяем сбор монеток
                 checkCoinCollection();
@@ -331,46 +349,84 @@
             }
         }
         
-        function determineDinoPosition() {
+        function determineDinoHeight() {
             let newLine = currentLine;
             
-            // Определяем новое положение на основе громкости
+            // Определяем новое положение по высоте
             if (averageVolume < 20) { // Шёпот
-                newLine = 'bottom'; // Верхняя линия
+                newLine = 'top';
             } else if (averageVolume < 60) { // Обычный голос
                 newLine = 'middle';
             } else { // Громкий голос
-                newLine = 'top'; // Нижняя линия
+                newLine = 'bottom';
             }
             
-            // Если положение изменилось - обновляем
+            // Если высота изменилась - обновляем
             if (newLine !== currentLine) {
                 currentLine = newLine;
-                updateDinoPosition();
+                updateDinoHeight();
             }
         }
         
-        function updateDinoPosition() {
+        function updateDinoHeight() {
             let bottomPosition;
             let statusText;
             
             switch(currentLine) {
-                case 'top': // Нижняя линия (громко)
-                    bottomPosition = '75vh';
-                    statusText = "Громко - нижняя линия";
+                case 'top':
+                    bottomPosition = '25vh';
+                    statusText = "Шёпот - верхняя линия";
                     break;
                 case 'middle':
                     bottomPosition = '50vh';
                     statusText = "Нормально - средняя линия";
                     break;
-                case 'bottom': // Верхняя линия (шёпот)
-                    bottomPosition = '25vh';
-                    statusText = "Шёпот - верхняя линия";
+                case 'bottom':
+                    bottomPosition = '75vh';
+                    statusText = "Громко - нижняя линия";
                     break;
             }
             
             dino.style.bottom = bottomPosition;
             statusDisplay.textContent = statusText;
+        }
+        
+        function moveDino() {
+            // Двигаемся только если есть звук
+            if (averageVolume > 10) {
+                isMoving = true;
+                dinoPosition += 3;
+                roadPosition -= 3;
+                
+                if (roadPosition <= -window.innerWidth) {
+                    roadPosition = 0;
+                }
+                
+                dino.style.left = dinoPosition + 'px';
+                road.style.left = roadPosition + 'px';
+                
+                // Двигаем монетки
+                coins.forEach(coin => {
+                    if (!coin.collected) {
+                        coin.x -= 3;
+                        coin.element.style.left = coin.x + 'px';
+                        
+                        // Удаляем монетки за экраном
+                        if (coin.x < -50) {
+                            coin.element.remove();
+                            coin.collected = true;
+                        }
+                    }
+                });
+                
+                // Генерируем новые монетки если все собраны
+                if (coins.every(c => c.collected)) {
+                    generateCoins();
+                }
+            } else {
+                isMoving = false;
+                statusDisplay.textContent = "Тишина - движение остановлено";
+            }
         }
         
         function checkCoinCollection() {
@@ -394,12 +450,7 @@
                         
                         // Анимация сбора
                         statusDisplay.textContent = "Монетка собрана!";
-                        setTimeout(() => updateDinoPosition(), 1000);
-                        
-                        // Если все монетки собраны - генерируем новые
-                        if (coins.every(c => c.collected)) {
-                            generateCoins();
-                        }
+                        setTimeout(() => updateDinoHeight(), 1000);
                     }
                 }
             });
@@ -411,6 +462,7 @@
             if (audioContext) audioContext.close();
             
             dino.style.bottom = "50vh";
+            dino.style.left = "50px";
             instructions.style.display = "block";
             startBtn.disabled = false;
             startBtn.textContent = "Попробовать снова";
@@ -420,6 +472,10 @@
             scoreDisplay.textContent = "Монет: 0";
             coins.forEach(coin => coin.element.remove());
             coins = [];
+            roadPosition = 0;
+            road.style.left = "0px";
+            dinoPosition = 50;
+            isMoving = false;
         }
         
         window.addEventListener('beforeunload', resetGame);
