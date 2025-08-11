@@ -22,7 +22,7 @@
         #dino {
             position: absolute;
             left: 50px;
-            bottom: 150px;
+            bottom: 50vh;
             width: 80px;
             height: 86px;
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
@@ -156,9 +156,9 @@
             <h2>Голосовой динозавр</h2>
             <p>Управляйте динозавром голосом:</p>
             <ul style="text-align: left; margin: 10px auto; width: fit-content;">
-                <li>Шёпот (зелёная зона) - верхняя линия</li>
-                <li>Обычный голос (жёлтая зона) - средняя линия</li>
-                <li>Громкий голос (красная зона) - нижняя линия</li>
+                <li>Тихий голос (зелёная зона) - нижняя линия</li>
+                <li>Средний голос (жёлтая зона) - средняя линия</li>
+                <li>Громкий голос (красная зона) - верхняя линия</li>
             </ul>
             <p><strong>Динозавр движется вправо, когда вы говорите!</strong></p>
             <div id="volume-display">
@@ -223,7 +223,7 @@
                 .then(stream => {
                     startBtn.textContent = "Микрофон включен";
                     instructions.style.display = "none";
-                    statusDisplay.textContent = "Говорите - динозавр будет двигаться";
+                    statusDisplay.textContent = "Говорите — динозавр будет двигаться";
                     
                     setupAudio(stream);
                     generateCoins();
@@ -271,11 +271,9 @@
         }
         
         function generateCoins() {
-            // Удаляем старые монетки
             coins.forEach(coin => coin.element.remove());
             coins = [];
             
-            // Генерируем 3-5 монеток на случайных линиях
             const coinCount = Math.floor(Math.random() * 3) + 3;
             const lines = ['top', 'middle', 'bottom'];
             
@@ -288,9 +286,9 @@
                 
                 let yPos;
                 switch(line) {
-                    case 'top': yPos = '25vh'; break;
-                    case 'middle': yPos = '50vh'; break;
-                    case 'bottom': yPos = '75vh'; break;
+                    case 'top': yPos = '75vh'; break;    // bottom: 75vh
+                    case 'middle': yPos = '50vh'; break; // bottom: 50vh
+                    case 'bottom': yPos = '25vh'; break; // bottom: 25vh
                 }
                 
                 coin.style.left = `${x}px`;
@@ -313,20 +311,12 @@
             function animate() {
                 analyser.getByteFrequencyData(dataArray);
                 
-                // Вычисляем уровень громкости
                 let sum = dataArray.reduce((a, b) => a + b, 0);
                 averageVolume = sum / bufferLength;
                 
-                // Обновляем индикатор громкости
                 updateVolumeDisplay(averageVolume);
-                
-                // Определяем положение динозавра по высоте
                 determineDinoHeight();
-                
-                // Двигаем динозавра и дорогу
                 moveDino();
-                
-                // Проверяем сбор монеток
                 checkCoinCollection();
                 
                 animationId = requestAnimationFrame(animate);
@@ -336,8 +326,9 @@
         }
         
         function updateVolumeDisplay(volume) {
-            const maxVolume = 100;
-            const level = Math.min(volume / maxVolume * 100, 100);
+            // Нормализуем громкость в 0-100%
+            const normalizedVolume = Math.min((averageVolume / 120) * 100, 100);
+            const level = normalizedVolume;
             volumeLevel.style.width = level + '%';
             
             if (level < 30) {
@@ -351,17 +342,16 @@
         
         function determineDinoHeight() {
             let newLine = currentLine;
-            
-            // Определяем новое положение по высоте
-            if (averageVolume < 20) { // Шёпот
-                newLine = 'top';
-            } else if (averageVolume < 60) { // Обычный голос
-                newLine = 'middle';
-            } else { // Громкий голос
+            const normalizedVolume = Math.min((averageVolume / 120) * 100, 100); // 0-100%
+
+            if (normalizedVolume < 30) {
                 newLine = 'bottom';
+            } else if (normalizedVolume < 70) {
+                newLine = 'middle';
+            } else {
+                newLine = 'top';
             }
             
-            // Если высота изменилась - обновляем
             if (newLine !== currentLine) {
                 currentLine = newLine;
                 updateDinoHeight();
@@ -374,16 +364,16 @@
             
             switch(currentLine) {
                 case 'top':
-                    bottomPosition = '25vh';
-                    statusText = "Шёпот - верхняя линия";
+                    bottomPosition = '75vh';
+                    statusText = "Громко - верхняя линия";
                     break;
                 case 'middle':
                     bottomPosition = '50vh';
-                    statusText = "Нормально - средняя линия";
+                    statusText = "Средне - средняя линия";
                     break;
                 case 'bottom':
-                    bottomPosition = '75vh';
-                    statusText = "Громко - нижняя линия";
+                    bottomPosition = '25vh';
+                    statusText = "Тихо - нижняя линия";
                     break;
             }
             
@@ -392,7 +382,6 @@
         }
         
         function moveDino() {
-            // Двигаемся только если есть звук
             if (averageVolume > 10) {
                 isMoving = true;
                 dinoPosition += 3;
@@ -405,13 +394,11 @@
                 dino.style.left = dinoPosition + 'px';
                 road.style.left = roadPosition + 'px';
                 
-                // Двигаем монетки
                 coins.forEach(coin => {
                     if (!coin.collected) {
                         coin.x -= 3;
                         coin.element.style.left = coin.x + 'px';
                         
-                        // Удаляем монетки за экраном
                         if (coin.x < -50) {
                             coin.element.remove();
                             coin.collected = true;
@@ -419,7 +406,6 @@
                     }
                 });
                 
-                // Генерируем новые монетки если все собраны
                 if (coins.every(c => c.collected)) {
                     generateCoins();
                 }
@@ -436,19 +422,16 @@
                 if (!coin.collected && coin.line === currentLine) {
                     const coinRect = coin.element.getBoundingClientRect();
                     
-                    // Проверяем столкновение
                     if (!(dinoRect.right < coinRect.left || 
                           dinoRect.left > coinRect.right || 
                           dinoRect.bottom < coinRect.top || 
                           dinoRect.top > coinRect.bottom)) {
                         
-                        // Собираем монетку
                         coin.collected = true;
                         coin.element.remove();
                         score++;
                         scoreDisplay.textContent = `Монет: ${score}`;
                         
-                        // Анимация сбора
                         statusDisplay.textContent = "Монетка собрана!";
                         setTimeout(() => updateDinoHeight(), 1000);
                     }
