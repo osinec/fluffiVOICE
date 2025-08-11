@@ -8,7 +8,7 @@
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #87CEEB; /* Светло-голубое небо */
+            background-color: #87CEEB;
             font-family: Arial, sans-serif;
         }
         
@@ -21,12 +21,12 @@
         
         .mountain {
             position: absolute;
-            bottom: 150px; /* Над дорогой */
+            bottom: 150px;
             width: 300px;
             height: 200px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 L300,200 L0,200 Z" fill="%23666" stroke="%23333" stroke-width="2"/></svg>');
+            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 L300,200 L0,200 Z" fill="%23666" stroke="%23333" stroke-width="2"/></svg>');
             background-repeat: no-repeat;
-            z-index: 3; /* Между дорогой и динозавром */
+            z-index: 3;
         }
         
         #dino {
@@ -35,7 +35,7 @@
             bottom: 50vh;
             width: 80px;
             height: 86px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M20,60 L20,40 L30,40 L30,20 L40,20 L40,10 L50,10 L50,20 L60,20 L60,40 L70,40 L70,60 L60,60 L60,70 L50,70 L50,80 L40,80 L40,70 L30,70 L30,60 L20,60 Z" fill="%23333"/><rect x="25" y="45" width="10" height="5" fill="%23fff"/><rect x="45" y="45" width="10" height="5" fill="%23fff"/></svg>');
+            background-size: contain;
             background-repeat: no-repeat;
             z-index: 10;
             transition: bottom 0.3s ease;
@@ -46,7 +46,7 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background-color: black;
+            background-color: rgba(0,0,0,0.5);
             z-index: 5;
         }
         
@@ -58,7 +58,7 @@
             position: absolute;
             width: 30px;
             height: 30px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="gold" stroke="%23D4AF37" stroke-width="2"/></svg>');
+            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="gold" stroke="%23D4AF37" stroke-width="2"/></svg>');
             background-repeat: no-repeat;
             z-index: 8;
         }
@@ -85,6 +85,30 @@
             padding: 5px 10px;
             border-radius: 5px;
             z-index: 20;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 30;
+        }
+        
+        .upload-btn {
+            padding: 8px 12px;
+            font-size: 14px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        #file-input-dino, #file-input-bg {
+            display: none;
         }
         
         #instructions {
@@ -147,23 +171,29 @@
 </head>
 <body>
     <div id="game-container">
+        <!-- Управление загрузкой -->
+        <div id="controls">
+            <input type="file" id="file-input-dino" accept="image/*">
+            <input type="file" id="file-input-bg" accept="image/*">
+            
+            <button class="upload-btn" onclick="document.getElementById('file-input-dino').click();">🐉 Загрузить дракона</button>
+            <button class="upload-btn" onclick="document.getElementById('file-input-bg').click();">🌄 Загрузить фон</button>
+        </div>
+
         <div id="status">Статус: Нажмите "Включить микрофон"</div>
         <div id="score-display">Монет: 0</div>
+        
         <div class="guide-line" id="top-line"></div>
         <div class="guide-line" id="middle-line"></div>
         <div class="guide-line" id="bottom-line"></div>
+        
         <div id="road"></div>
-        <!-- Горы будут добавлены скриптом -->
         <div id="dino"></div>
+        
         <div id="instructions">
-            <h2>Голосовой динозавр</h2>
-            <p>Управляйте динозавром голосом:</p>
-            <ul style="text-align: left; margin: 10px auto; width: fit-content;">
-                <li>Тихий голос (зелёная зона) - нижняя линия</li>
-                <li>Средний голос (жёлтая зона) - средняя линия</li>
-                <li>Громкий голос (красная зона) - верхняя линия</li>
-            </ul>
-            <p><strong>Динозавр движется вправо, когда вы говорите!</strong></p>
+            <h2>Голосовой дракон</h2>
+            <p>Управляйте драконом голосом!</p>
+            <p>Вы можете загрузить свою картинку дракона и фон.</p>
             <div id="volume-display">
                 <div id="volume-level"></div>
             </div>
@@ -182,6 +212,8 @@
         const volumeLevel = document.getElementById('volume-level');
         const gameContainer = document.getElementById('game-container');
         const road = document.getElementById('road');
+        const fileInputDino = document.getElementById('file-input-dino');
+        const fileInputBg = document.getElementById('file-input-bg');
         
         let audioContext;
         let analyser;
@@ -191,16 +223,67 @@
         let currentLine = 'middle';
         let score = 0;
         let coins = [];
-        let mountains = []; // Храним объекты гор
+        let mountains = [];
         let roadPosition = 0;
-        let mountainPosition = 0; // Отдельная позиция для гор
+        let mountainPosition = 0;
         let dinoPosition = 50;
         let isMoving = false;
         
-        // 🔧 НАСТРОЙКА: скорость параллакса (меньше = медленнее)
-        const MOUNTAIN_SPEED_RATIO = 0.3; // 30% скорости дороги
-        
-        // Проверка поддержки API
+        const MOUNTAIN_SPEED_RATIO = 0.3;
+
+        // 🔧 Загружаем сохранённые изображения из localStorage
+        function loadSavedImages() {
+            const savedDino = localStorage.getItem('customDinoUrl');
+            const savedBg = localStorage.getItem('customBgUrl');
+            
+            if (savedDino) {
+                dino.style.backgroundImage = `url(${savedDino})`;
+            }
+            
+            if (savedBg) {
+                document.body.style.backgroundImage = `url(${savedBg})`;
+                document.body.style.backgroundSize = 'cover';
+                document.body.style.backgroundAttachment = 'fixed';
+            } else {
+                document.body.style.backgroundColor = '#87CEEB'; // стандартный цвет
+            }
+        }
+
+        // 🔧 Обработчик загрузки изображения дракона
+        fileInputDino.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.match('image.*')) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const url = event.target.result;
+                    dino.style.backgroundImage = `url(${url})`;
+                    localStorage.setItem('customDinoUrl', url);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 🔧 Обработчик загрузки фона
+        fileInputBg.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.match('image.*')) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const url = event.target.result;
+                    document.body.style.backgroundImage = `url(${url})`;
+                    document.body.style.backgroundSize = 'cover';
+                    document.body.style.backgroundAttachment = 'fixed';
+                    document.body.style.backgroundColor = '';
+                    localStorage.setItem('customBgUrl', url);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Инициализация
+        loadSavedImages();
+
+        // --- Остальной код игры ---
         if (!window.AudioContext && !window.webkitAudioContext) {
             showError("Ваш браузер не поддерживает Web Audio API");
             startBtn.disabled = true;
@@ -231,11 +314,11 @@
                 .then(stream => {
                     startBtn.textContent = "Микрофон включен";
                     instructions.style.display = "none";
-                    statusDisplay.textContent = "Говорите — динозавр будет двигаться";
+                    statusDisplay.textContent = "Говорите — дракон будет двигаться";
                     
                     setupAudio(stream);
                     generateCoins();
-                    generateMountains(); // Создаём горы
+                    generateMountains();
                     startAnimation();
                 })
                 .catch(error => {
@@ -260,7 +343,6 @@
         
         function handleMicrophoneError(error) {
             let message = "Ошибка доступа к микрофону: ";
-            
             switch(error.name) {
                 case 'NotAllowedError':
                     message += "Вы отказали в доступе к микрофону";
@@ -274,14 +356,11 @@
                 default:
                     message += error.message;
             }
-            
             showError(message);
             statusDisplay.textContent = "Ошибка микрофона";
         }
         
-        // Создаём 5 гор на старте
         function generateMountains() {
-            // Удаляем старые
             mountains.forEach(m => m.element.remove());
             mountains = [];
             
@@ -289,9 +368,7 @@
             for (let i = 0; i < mountainCount; i++) {
                 const mountain = document.createElement('div');
                 mountain.className = 'mountain';
-                
-                // Распределяем по ширине + за экран
-                const x = i * 600 - 300; // Примерно каждые 600px
+                const x = i * 600 - 300;
                 mountain.style.left = `${x}px`;
                 gameContainer.appendChild(mountain);
                 
@@ -358,7 +435,6 @@
         }
         
         function updateVolumeDisplay(volume) {
-            // 🔧 НАСТРОЙКА чувствительности
             const normalizedVolume = Math.min((averageVolume / 120) * 100, 100);
             const level = normalizedVolume;
             volumeLevel.style.width = level + '%';
@@ -376,7 +452,6 @@
             let newLine = currentLine;
             const normalizedVolume = Math.min((averageVolume / 120) * 100, 100);
 
-            // 🔧 НАСТРОЙКА порогов
             if (normalizedVolume < 30) {
                 newLine = 'bottom';
             } else if (normalizedVolume < 70) {
@@ -415,22 +490,14 @@
         }
         
         function moveDino() {
-            // 🔧 НАСТРОЙКА: минимальная громкость для движения
             if (averageVolume > 10) {
                 isMoving = true;
                 dinoPosition += 3;
                 roadPosition -= 3;
-                mountainPosition -= 3 * MOUNTAIN_SPEED_RATIO; // Горы движутся медленнее
+                mountainPosition -= 3 * MOUNTAIN_SPEED_RATIO;
                 
-                // Циклическое движение дороги
-                if (roadPosition <= -window.innerWidth) {
-                    roadPosition += window.innerWidth;
-                }
-                
-                // Циклическое движение гор
-                if (mountainPosition <= -window.innerWidth * MOUNTAIN_SPEED_RATIO) {
-                    mountainPosition += window.innerWidth * MOUNTAIN_SPEED_RATIO;
-                }
+                if (roadPosition <= -window.innerWidth) roadPosition += window.innerWidth;
+                if (mountainPosition <= -window.innerWidth * MOUNTAIN_SPEED_RATIO) mountainPosition += window.innerWidth * MOUNTAIN_SPEED_RATIO;
                 
                 dino.style.left = dinoPosition + 'px';
                 road.style.left = roadPosition + 'px';
