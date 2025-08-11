@@ -25,8 +25,7 @@
             bottom: 150px;
             width: 300px;
             height: 200px;
-            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрная гора */
-            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 L300,200 L0,200 Z" fill="%23000"/></svg>');
+            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 Z" fill="%23000"/></svg>');
             background-repeat: no-repeat;
             z-index: 3;
         }
@@ -37,12 +36,11 @@
             bottom: 50vh;
             width: 80px;
             height: 86px;
+            background-color: #000; /* 🔒 fallback: чёрный прямоугольник */
             background-size: contain;
             background-repeat: no-repeat;
             z-index: 10;
             transition: bottom 0.3s ease;
-            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрный дракон */
-            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M10,50 L20,30 L30,35 L40,20 L50,30 L60,25 L70,40 L65,50 L55,60 L40,55 L30,65 L20,60 Z" fill="%23000"/></svg>');
         }
         
         .guide-line {
@@ -62,9 +60,8 @@
             position: absolute;
             width: 30px;
             height: 30px;
-            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрная монета */
-            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="%23000"/></svg>');
-            background-repeat: no-repeat;
+            background-color: #000;
+            border-radius: 50%;
             z-index: 8;
         }
         
@@ -225,294 +222,238 @@
         
         const MOUNTAIN_SPEED_RATIO = 0.3;
 
+        // Проверка поддержки
         if (!window.AudioContext && !window.webkitAudioContext) {
-            showError("Ваш браузер не поддерживает Web Audio API");
+            showError("Web Audio API не поддерживается");
             startBtn.disabled = true;
         }
-        
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showError("Ваш браузер не поддерживает доступ к микрофону");
+        if (!navigator.mediaDevices) {
+            showError("Микрофон не поддерживается");
             startBtn.disabled = true;
         }
-        
+
         startBtn.addEventListener('click', initAudio);
-        
-        function showError(message) {
-            errorMessage.textContent = message;
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
             statusDisplay.textContent = "Ошибка";
-            console.error(message);
+            console.error(msg);
         }
-        
+
         function initAudio() {
             startBtn.disabled = true;
-            statusDisplay.textContent = "Запрос доступа к микрофону...";
-            errorMessage.textContent = "";
-            
-            if (microphone) microphone.disconnect();
-            if (audioContext) audioContext.close();
-            
+            statusDisplay.textContent = "Запрос микрофона...";
+
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
                     startBtn.textContent = "Микрофон включен";
                     instructions.style.display = "none";
                     statusDisplay.textContent = "Говорите — дракон будет двигаться";
-                    
-                    setupAudio(stream);
-                    generateCoins(); // Первый ряд
+
+                    // Инициализация аудио
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 256;
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    microphone.connect(analyser);
+
+                    // Инициализация игры
+                    dino.style.backgroundImage = ""; // Убираем, если был SVG
+                    dino.style.backgroundColor = "#000"; // Надёжный чёрный цвет
+
                     generateMountains();
-                    startAnimation();
+                    generateCoins(); // ✅ Только после старта
+                    startAnimation(); // ✅ Запускаем анимацию
+
+                    stream.getAudioTracks()[0].onended = () => {
+                        showError("Микрофон отключён");
+                        resetGame();
+                    };
                 })
                 .catch(error => {
                     startBtn.disabled = false;
                     handleMicrophoneError(error);
                 });
         }
-        
-        function setupAudio(stream) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            
-            microphone = audioContext.createMediaStreamSource(stream);
-            microphone.connect(analyser);
-            
-            stream.getAudioTracks()[0].onended = () => {
-                showError("Микрофон был отключен");
-                resetGame();
-            };
-        }
-        
+
         function handleMicrophoneError(error) {
-            let message = "Ошибка доступа к микрофону: ";
-            switch(error.name) {
+            let msg = "Ошибка микрофона: ";
+            switch (error.name) {
                 case 'NotAllowedError':
-                    message += "Вы отказали в доступе к микрофону";
+                    msg += "доступ запрещён";
                     break;
                 case 'NotFoundError':
-                    message += "Микрофон не найден";
-                    break;
-                case 'NotReadableError':
-                    message += "Микрофон уже используется";
+                    msg += "микрофон не найден";
                     break;
                 default:
-                    message += error.message;
+                    msg += error.message;
             }
-            showError(message);
-            statusDisplay.textContent = "Ошибка микрофона";
+            showError(msg);
         }
-        
+
         function generateMountains() {
             mountains.forEach(m => m.element.remove());
             mountains = [];
-            
-            const mountainCount = 5;
-            for (let i = 0; i < mountainCount; i++) {
-                const mountain = document.createElement('div');
-                mountain.className = 'mountain';
+            const count = 5;
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = 'mountain';
                 const x = i * 600 - 300;
-                mountain.style.left = `${x}px`;
-                gameContainer.appendChild(mountain);
-                
-                mountains.push({
-                    element: mountain,
-                    x: x
-                });
+                el.style.left = `${x}px`;
+                gameContainer.appendChild(el);
+                mountains.push({ element: el, x: x });
             }
         }
 
-        // ✅ Генерация ряда из 7 монет
         function generateCoins() {
-            coins.forEach(coin => coin.element.remove());
+            coins.forEach(c => c.element.remove());
             coins = [];
 
             const lines = ['top', 'middle', 'bottom'];
-            const line = lines[Math.floor(Math.random() * lines.length)];
-            
-            let yPos;
-            switch(line) {
-                case 'top': yPos = '75vh'; break;
-                case 'middle': yPos = '50vh'; break;
-                case 'bottom': yPos = '25vh'; break;
-            }
+            const line = lines[Math.floor(Math.random() * 3)];
+            const yPos = line === 'top' ? '75vh' : line === 'middle' ? '50vh' : '25vh';
 
-            const count = 7;
+            const startX = window.innerWidth + 200;
             const spacing = 80;
-            const startX = window.innerWidth + 200; // Далеко впереди
 
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < 7; i++) {
                 const x = startX + i * spacing;
-
                 const coin = document.createElement('div');
                 coin.className = 'coin';
                 coin.style.left = `${x}px`;
                 coin.style.bottom = yPos;
                 gameContainer.appendChild(coin);
-
-                coins.push({
-                    element: coin,
-                    x: x,
-                    line: line,
-                    collected: false
-                });
+                coins.push({ element: coin, x, line, collected: false });
             }
         }
-        
+
         function startAnimation() {
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
-            
+
             function animate() {
                 analyser.getByteFrequencyData(dataArray);
-                
-                let sum = dataArray.reduce((a, b) => a + b, 0);
+                const sum = dataArray.reduce((a, b) => a + b, 0);
                 averageVolume = sum / bufferLength;
-                
+
                 updateVolumeBars(averageVolume);
                 determineDinoHeight();
                 moveDino();
                 checkCoinCollection();
-                
+
                 animationId = requestAnimationFrame(animate);
             }
-            
-            animate();
+
+            animate(); // ✅ Анимация стартует
         }
-        
-        function updateVolumeBars(volume) {
-            const level = Math.floor((averageVolume / 120) * 10); // 0–10
+
+        function updateVolumeBars(vol) {
+            const level = Math.min(Math.floor((vol / 120) * 10), 10);
             volumeBars.forEach((bar, i) => {
                 bar.style.opacity = i < level ? '1' : '0';
             });
         }
-        
-        function determineDinoHeight() {
-            let newLine = currentLine;
-            const normalizedVolume = Math.min((averageVolume / 120) * 100, 100);
 
-            if (normalizedVolume < 30) {
-                newLine = 'bottom';
-            } else if (normalizedVolume < 70) {
-                newLine = 'middle';
-            } else {
-                newLine = 'top';
-            }
-            
+        function determineDinoHeight() {
+            const vol = (averageVolume / 120) * 100;
+            let newLine = currentLine;
+
+            if (vol < 30) newLine = 'bottom';
+            else if (vol < 70) newLine = 'middle';
+            else newLine = 'top';
+
             if (newLine !== currentLine) {
                 currentLine = newLine;
                 updateDinoHeight();
             }
         }
-        
+
         function updateDinoHeight() {
-            let bottomPosition;
-            let statusText;
-            
-            switch(currentLine) {
-                case 'top':
-                    bottomPosition = '75vh';
-                    statusText = "Громко - верхняя линия";
-                    break;
-                case 'middle':
-                    bottomPosition = '50vh';
-                    statusText = "Средне - средняя линия";
-                    break;
-                case 'bottom':
-                    bottomPosition = '25vh';
-                    statusText = "Тихо - нижняя линия";
-                    break;
+            let pos, text;
+            switch (currentLine) {
+                case 'top': pos = '75vh'; text = "Громко — вверх"; break;
+                case 'middle': pos = '50vh'; text = "Средний уровень"; break;
+                case 'bottom': pos = '25vh'; text = "Тихо — вниз"; break;
             }
-            
-            dino.style.bottom = bottomPosition;
-            statusDisplay.textContent = statusText;
+            dino.style.bottom = pos;
+            statusDisplay.textContent = text;
         }
-        
+
         function moveDino() {
             if (averageVolume > 10) {
                 isMoving = true;
                 dinoPosition += 3;
                 roadPosition -= 3;
                 mountainPosition -= 3 * MOUNTAIN_SPEED_RATIO;
-                
+
                 if (roadPosition <= -window.innerWidth) roadPosition += window.innerWidth;
                 if (mountainPosition <= -window.innerWidth * MOUNTAIN_SPEED_RATIO) mountainPosition += window.innerWidth * MOUNTAIN_SPEED_RATIO;
-                
+
                 dino.style.left = dinoPosition + 'px';
                 road.style.left = roadPosition + 'px';
-                
-                // Двигаем монеты
+
                 coins.forEach(coin => {
                     if (!coin.collected) {
                         coin.x -= 3;
                         coin.element.style.left = coin.x + 'px';
                     }
                 });
-                
-                // Двигаем горы
+
                 mountains.forEach(mountain => {
-                    mountain.x = (mountain.x - 3 * MOUNTAIN_SPEED_RATIO) % (window.innerWidth * 2);
+                    mountain.x -= 3 * MOUNTAIN_SPEED_RATIO;
                     if (mountain.x < -300) mountain.x += window.innerWidth * 2;
                     mountain.element.style.left = mountain.x + 'px';
                 });
-                
-                // ✅ Если все 7 монет собраны — создаём новый ряд
+
                 if (coins.length > 0 && coins.every(c => c.collected)) {
                     generateCoins();
                 }
             } else {
                 isMoving = false;
-                statusDisplay.textContent = "Тишина - движение остановлено";
+                statusDisplay.textContent = "Тишина — движение остановлено";
             }
         }
-        
+
         function checkCoinCollection() {
             const dinoRect = dino.getBoundingClientRect();
-            
             coins.forEach(coin => {
                 if (!coin.collected && coin.line === currentLine) {
-                    const coinRect = coin.element.getBoundingClientRect();
-                    
-                    if (!(dinoRect.right < coinRect.left || 
-                          dinoRect.left > coinRect.right || 
-                          dinoRect.bottom < coinRect.top || 
-                          dinoRect.top > coinRect.bottom)) {
-                        
+                    const rect = coin.element.getBoundingClientRect();
+                    const overlap = !(dinoRect.right < rect.left || dinoRect.left > rect.right || dinoRect.bottom < rect.top || dinoRect.top > rect.bottom);
+                    if (overlap) {
                         coin.collected = true;
                         coin.element.remove();
                         score++;
                         scoreDisplay.textContent = `Монет: ${score}`;
-                        
                         statusDisplay.textContent = "Монетка собрана!";
-                        setTimeout(() => updateDinoHeight(), 1000);
+                        setTimeout(updateDinoHeight, 1000);
                     }
                 }
             });
         }
-        
+
         function resetGame() {
             if (animationId) cancelAnimationFrame(animationId);
             if (microphone) microphone.disconnect();
             if (audioContext) audioContext.close();
-            
             dino.style.bottom = "50vh";
             dino.style.left = "50px";
             instructions.style.display = "block";
             startBtn.disabled = false;
             startBtn.textContent = "Попробовать снова";
-            currentLine = 'middle';
             statusDisplay.textContent = "Нажмите 'Включить микрофон'";
             score = 0;
             scoreDisplay.textContent = "Монет: 0";
-            coins.forEach(coin => coin.element.remove());
+            coins.forEach(c => c.element.remove());
             coins = [];
             mountains.forEach(m => m.element.remove());
             mountains = [];
             roadPosition = 0;
             mountainPosition = 0;
-            road.style.left = "0px";
             dinoPosition = 50;
-            isMoving = false;
+            road.style.left = "0px";
         }
-        
+
         window.addEventListener('beforeunload', resetGame);
     </script>
 </body>
