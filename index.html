@@ -8,9 +8,9 @@
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #eee; /* светло-серый фон */
+            background-color: #fff;
             font-family: Arial, sans-serif;
-            color: #333;
+            color: #000;
         }
         
         #game-container {
@@ -25,8 +25,8 @@
             bottom: 150px;
             width: 300px;
             height: 200px;
-            /* Чёрно-серые горы */
-            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 L300,200 L0,200 Z" fill="%23666" stroke="%23333" stroke-width="2"/></svg>');
+            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрная гора */
+            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><path d="M0,200 L50,100 L100,200 L150,80 L200,200 L250,60 L300,200 L300,200 L0,200 Z" fill="%23000"/></svg>');
             background-repeat: no-repeat;
             z-index: 3;
         }
@@ -41,9 +41,7 @@
             background-repeat: no-repeat;
             z-index: 10;
             transition: bottom 0.3s ease;
-            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: свой чёрно-белый дракон */
-            /* Пример: background-image: url('data:image/svg+xml;utf8,<svg>...</svg>'); */
-            /* По умолчанию — силуэт чёрного дракона */
+            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрный дракон */
             background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 86"><path d="M10,50 L20,30 L30,35 L40,20 L50,30 L60,25 L70,40 L65,50 L55,60 L40,55 L30,65 L20,60 Z" fill="%23000"/></svg>');
         }
         
@@ -52,7 +50,7 @@
             left: 0;
             width: 100%;
             height: 1px;
-            background-color: #999;
+            background-color: #000;
             z-index: 5;
         }
         
@@ -64,9 +62,8 @@
             position: absolute;
             width: 30px;
             height: 30px;
-            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: монета в чёрно-белом стиле */
-            /* Пример: чёрный круг с белой окантовкой */
-            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="%23000" stroke="%23333" stroke-width="2"/></svg>');
+            /* 🖼️ ЗАМЕНИТЬ КАРТИНКУ: чёрная монета */
+            background-image: url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="%23000"/></svg>');
             background-repeat: no-repeat;
             z-index: 8;
         }
@@ -76,9 +73,10 @@
             top: 20px;
             left: 20px;
             font-size: 18px;
-            color: #333;
-            background-color: rgba(238, 238, 238, 0.8);
+            color: #000;
+            background-color: #fff;
             padding: 5px 10px;
+            border: 1px solid #000;
             border-radius: 5px;
             z-index: 20;
         }
@@ -88,9 +86,10 @@
             top: 20px;
             right: 20px;
             font-size: 18px;
-            color: #333;
-            background-color: rgba(238, 238, 238, 0.8);
+            color: #000;
+            background-color: #fff;
             padding: 5px 10px;
+            border: 1px solid #000;
             border-radius: 5px;
             z-index: 20;
         }
@@ -101,19 +100,19 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: #fff;
             padding: 20px;
+            border: 2px solid #000;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
             z-index: 20;
         }
         
         button {
             padding: 10px 20px;
             font-size: 16px;
-            background-color: #333;
-            color: white;
-            border: none;
+            background-color: #000;
+            color: #fff;
+            border: 2px solid #000;
             border-radius: 5px;
             cursor: pointer;
             margin-top: 10px;
@@ -122,25 +121,26 @@
         #volume-display {
             height: 20px;
             width: 100%;
-            background: linear-gradient(to right, #000, #999, #fff);
+            background-color: #fff;
+            border: 1px solid #000;
             margin-top: 10px;
-            border-radius: 5px;
-            position: relative;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
         }
         
-        #volume-level {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .volume-bar {
+            width: 10%;
             height: 100%;
-            width: 0%;
-            background-color: rgba(255,255,255,0.6);
+            background-color: #000;
+            opacity: 0;
         }
         
         #error-message {
-            color: #c00;
+            color: #000;
             margin-top: 10px;
             font-size: 14px;
+            font-weight: bold;
         }
         
         #road {
@@ -148,7 +148,7 @@
             bottom: 0;
             width: 200%;
             height: 150px;
-            background-color: #666; /* серый асфальт */
+            background-color: #000;
             z-index: 4;
         }
     </style>
@@ -168,9 +168,18 @@
         <div id="instructions">
             <h2>Голосовой дракон</h2>
             <p>Управляйте драконом голосом!</p>
-            <p>Громко — вверх, тихо — вниз. Говорите, чтобы двигаться.</p>
+            <p>Громко — вверх, тихо — вниз.</p>
             <div id="volume-display">
-                <div id="volume-level"></div>
+                <div class="volume-bar" id="bar-1"></div>
+                <div class="volume-bar" id="bar-2"></div>
+                <div class="volume-bar" id="bar-3"></div>
+                <div class="volume-bar" id="bar-4"></div>
+                <div class="volume-bar" id="bar-5"></div>
+                <div class="volume-bar" id="bar-6"></div>
+                <div class="volume-bar" id="bar-7"></div>
+                <div class="volume-bar" id="bar-8"></div>
+                <div class="volume-bar" id="bar-9"></div>
+                <div class="volume-bar" id="bar-10"></div>
             </div>
             <button id="start-btn">Включить микрофон</button>
             <div id="error-message"></div>
@@ -184,9 +193,21 @@
         const startBtn = document.getElementById('start-btn');
         const instructions = document.getElementById('instructions');
         const errorMessage = document.getElementById('error-message');
-        const volumeLevel = document.getElementById('volume-level');
         const gameContainer = document.getElementById('game-container');
         const road = document.getElementById('road');
+        
+        const volumeBars = [
+            document.getElementById('bar-1'),
+            document.getElementById('bar-2'),
+            document.getElementById('bar-3'),
+            document.getElementById('bar-4'),
+            document.getElementById('bar-5'),
+            document.getElementById('bar-6'),
+            document.getElementById('bar-7'),
+            document.getElementById('bar-8'),
+            document.getElementById('bar-9'),
+            document.getElementById('bar-10')
+        ];
         
         let audioContext;
         let analyser;
@@ -204,12 +225,6 @@
         
         const MOUNTAIN_SPEED_RATIO = 0.3;
 
-        // --- Удалены: загрузка изображений и localStorage ---
-
-        // --- Инициализация ---
-        // (ничего не загружаем — всё встроено)
-
-        // --- Основной код ---
         if (!window.AudioContext && !window.webkitAudioContext) {
             showError("Ваш браузер не поддерживает Web Audio API");
             startBtn.disabled = true;
@@ -243,7 +258,7 @@
                     statusDisplay.textContent = "Говорите — дракон будет двигаться";
                     
                     setupAudio(stream);
-                    generateCoins();
+                    generateCoins(); // Первый ряд
                     generateMountains();
                     startAnimation();
                 })
@@ -304,32 +319,35 @@
                 });
             }
         }
-        
+
+        // ✅ Генерация ряда из 7 монет
         function generateCoins() {
             coins.forEach(coin => coin.element.remove());
             coins = [];
-            
-            const coinCount = Math.floor(Math.random() * 3) + 3;
+
             const lines = ['top', 'middle', 'bottom'];
+            const line = lines[Math.floor(Math.random() * lines.length)];
             
-            for (let i = 0; i < coinCount; i++) {
-                const line = lines[Math.floor(Math.random() * lines.length)];
-                const x = Math.random() * window.innerWidth * 0.7 + window.innerWidth * 0.3;
-                
+            let yPos;
+            switch(line) {
+                case 'top': yPos = '75vh'; break;
+                case 'middle': yPos = '50vh'; break;
+                case 'bottom': yPos = '25vh'; break;
+            }
+
+            const count = 7;
+            const spacing = 80;
+            const startX = window.innerWidth + 200; // Далеко впереди
+
+            for (let i = 0; i < count; i++) {
+                const x = startX + i * spacing;
+
                 const coin = document.createElement('div');
                 coin.className = 'coin';
-                
-                let yPos;
-                switch(line) {
-                    case 'top': yPos = '75vh'; break;
-                    case 'middle': yPos = '50vh'; break;
-                    case 'bottom': yPos = '25vh'; break;
-                }
-                
                 coin.style.left = `${x}px`;
                 coin.style.bottom = yPos;
                 gameContainer.appendChild(coin);
-                
+
                 coins.push({
                     element: coin,
                     x: x,
@@ -349,7 +367,7 @@
                 let sum = dataArray.reduce((a, b) => a + b, 0);
                 averageVolume = sum / bufferLength;
                 
-                updateVolumeDisplay(averageVolume);
+                updateVolumeBars(averageVolume);
                 determineDinoHeight();
                 moveDino();
                 checkCoinCollection();
@@ -360,18 +378,11 @@
             animate();
         }
         
-        function updateVolumeDisplay(volume) {
-            const normalizedVolume = Math.min((averageVolume / 120) * 100, 100);
-            const level = normalizedVolume;
-            volumeLevel.style.width = level + '%';
-            
-            if (level < 30) {
-                volumeLevel.style.backgroundColor = 'rgba(255,255,255,0.5)';
-            } else if (level < 70) {
-                volumeLevel.style.backgroundColor = 'rgba(200,200,200,0.5)';
-            } else {
-                volumeLevel.style.backgroundColor = 'rgba(150,150,150,0.5)';
-            }
+        function updateVolumeBars(volume) {
+            const level = Math.floor((averageVolume / 120) * 10); // 0–10
+            volumeBars.forEach((bar, i) => {
+                bar.style.opacity = i < level ? '1' : '0';
+            });
         }
         
         function determineDinoHeight() {
@@ -433,10 +444,6 @@
                     if (!coin.collected) {
                         coin.x -= 3;
                         coin.element.style.left = coin.x + 'px';
-                        if (coin.x < -50) {
-                            coin.element.remove();
-                            coin.collected = true;
-                        }
                     }
                 });
                 
@@ -447,7 +454,8 @@
                     mountain.element.style.left = mountain.x + 'px';
                 });
                 
-                if (coins.every(c => c.collected)) {
+                // ✅ Если все 7 монет собраны — создаём новый ряд
+                if (coins.length > 0 && coins.every(c => c.collected)) {
                     generateCoins();
                 }
             } else {
